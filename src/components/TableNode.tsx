@@ -59,6 +59,29 @@ export default function TableNode({ data }: { data: TableNodeData }) {
     }
   };
 
+  // Make PK exclusive: when a field is set to PK, clear any other PKs
+  const handlePkToggle = (index: number, isPk: boolean) => {
+    if (isPk) {
+      // unset any other PKs
+      (data.fields || []).forEach((f, i) => {
+        if (i !== index && f.pk) {
+          data.updateField(i, 'pk', false)
+        }
+      })
+      data.updateField(index, 'pk', true)
+      // enforce PK constraints
+      data.updateField(index, 'unique', true)
+      data.updateField(index, 'nullable', false)
+    } else {
+      data.updateField(index, 'pk', false)
+      const pkTypes = ['Int_autoinc', 'String_cuid', 'String_uuid']
+      const currType = data.fields?.[index]?.type
+      if (pkTypes.includes(currType)) {
+        data.updateField(index, 'type', 'Int')
+      }
+    }
+  }
+
   return (
     <div className="table-node">
       {/* Connection Handles - Top */}
@@ -150,7 +173,7 @@ export default function TableNode({ data }: { data: TableNodeData }) {
           <div className="field-cell name-cell">Name</div>
           <div className="field-cell type-cell">Type</div>
           <div className="field-cell nullable-cell">?</div>
-          <div className="field-cell unique-cell">U</div>
+          <div className="field-cell unique-cell">Unique</div>
           <div className="field-cell actions-cell"></div>
         </div>
 
@@ -162,6 +185,7 @@ export default function TableNode({ data }: { data: TableNodeData }) {
               index={index}
               updateField={data.updateField}
               deleteRow={data.deleteRow}
+              onPkToggle={handlePkToggle}
             />
           ))}
 
@@ -185,9 +209,10 @@ interface FieldRowProps {
   index: number;
   updateField: (index: number, key: keyof Field, value: any) => void;
   deleteRow: (index: number) => void;
+  onPkToggle?: (index: number, isPk: boolean) => void;
 }
 
-function FieldRow({ field, index, updateField, deleteRow }: FieldRowProps) {
+function FieldRow({ field, index, updateField, deleteRow, onPkToggle }: FieldRowProps) {
   return (
     <div className="field-row">
       {/* Primary Key Checkbox */}
@@ -196,23 +221,19 @@ function FieldRow({ field, index, updateField, deleteRow }: FieldRowProps) {
           type="checkbox"
           checked={field.pk}
           onChange={(e) => {
-            const isPk = e.target.checked;
-            updateField(index, 'pk', isPk);
-            if (isPk) {
-              // When PK is checked, set unique to true, nullable to false
-              // and pick a sensible default PK type if current type
-              // isn't one of the PK strategies.
-              const pkTypes = ['Int_autoinc', 'String_cuid', 'String_uuid'];
-              if (!pkTypes.includes(field.type)) {
-                updateField(index, 'type', 'Int_autoinc');
-              }
-              updateField(index, 'unique', true);
-              updateField(index, 'nullable', false);
+            const isPk = e.target.checked
+            if (onPkToggle) {
+              onPkToggle(index, isPk)
             } else {
-              // If PK is removed and the field was the auto-inc type, reset to Int
-              const pkTypes = ['Int_autoinc', 'String_cuid', 'String_uuid'];
-              if (pkTypes.includes(field.type)) {
-                updateField(index, 'type', 'Int');
+              updateField(index, 'pk', isPk)
+              if (isPk) {
+                updateField(index, 'unique', true)
+                updateField(index, 'nullable', false)
+              } else {
+                const pkTypes = ['Int_autoinc', 'String_cuid', 'String_uuid']
+                if (pkTypes.includes(field.type)) {
+                  updateField(index, 'type', 'Int')
+                }
               }
             }
           }}
@@ -241,19 +262,26 @@ function FieldRow({ field, index, updateField, deleteRow }: FieldRowProps) {
           {/* If this field is PK, show PK-strategy options (autoincrement, cuid, uuid). */}
           {field.pk ? (
             <>
-              <option value="Int_autoinc">autoincrement</option>
-              <option value="String_cuid">cuid</option>
-              <option value="String_uuid">uuid</option>
+              <option value="Int_autoinc">&#128477; auto inc</option>
+              <option value="String_cuid">&#128477; cuid</option>
+              <option value="String_uuid">&#128477; uuid</option>
+              <option value="String">string</option>
+              <option value="Int">int</option>
+              <option value="Float">float</option>
+              <option value="Boolean">boolean</option>
+              <option value="DateTime">datetime</option>
+              <option value="Json">json</option>
+              <option value="Bytes">bytes</option>
             </>
           ) : (
             <>
-              <option value="String">String</option>
-              <option value="Int">Int</option>
-              <option value="Float">Float</option>
-              <option value="Boolean">Boolean</option>
-              <option value="DateTime">DateTime</option>
-              <option value="Json">Json</option>
-              <option value="Bytes">Bytes</option>
+              <option value="String">string</option>
+              <option value="Int">int</option>
+              <option value="Float">float</option>
+              <option value="Boolean">boolean</option>
+              <option value="DateTime">datetime</option>
+              <option value="Json">json</option>
+              <option value="Bytes">bytes</option>
             </>
           )}
         </select>

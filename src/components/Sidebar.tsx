@@ -10,7 +10,7 @@ import PrismaModal from './PrismaModal'
 
 function getInitialTableData(): TableNodeData {
   const fields: Field[] = [
-    { name: 'UniqueID', type: 'Int', pk: true, fk: false, nullable: false, unique: true },
+    { name: 'UniqueID', type: 'Int_autoinc', pk: true, fk: false, nullable: false, unique: true },
     { name: 'Row 1', type: 'String', pk: false, fk: false, nullable: true, unique: false },
     { name: 'Row 2', type: 'String', pk: false, fk: false, nullable: true, unique: false },
     { name: 'Row 3', type: 'String', pk: false, fk: false, nullable: true, unique: false },

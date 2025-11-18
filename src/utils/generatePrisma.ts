@@ -45,23 +45,21 @@ export function generatePrismaSchema(nodes: Node[], edges: Edge[], datasourcePro
       let line = `  ${f.name} ${prismaType}${f.nullable ? '?' : ''}`
 
       if (f.pk) {
-        // Choose default based on the explicit field type when possible.
-        // Supported PK strategies: Int_autoinc -> autoincrement(),
-        // String_cuid -> cuid(), String_uuid -> uuid().
-        if (f.type === 'Int_autoinc' || prismaType === 'Int') {
+        // Only emit defaults when the user explicitly chose a PK strategy.
+        // - Int_autoinc -> autoincrement()
+        // - String_cuid -> cuid()
+        // - String_uuid -> uuid()
+        // If the user chose a plain base type (e.g. `Int` or `String`) as
+        // the PK, we just emit `@id` without a default so the choice is
+        // explicit and predictable.
+        if (f.type === 'Int_autoinc') {
           line += ' @id @default(autoincrement())'
         } else if (f.type === 'String_uuid') {
           line += ' @id @default(uuid())'
         } else if (f.type === 'String_cuid') {
           line += ' @id @default(cuid())'
         } else {
-          // Fallback: if Prisma type is Int prefer autoincrement,
-          // otherwise use cuid() as a reasonable default.
-          if (prismaType === 'Int') {
-            line += ' @id @default(autoincrement())'
-          } else {
-            line += ' @id @default(cuid())'
-          }
+          line += ' @id'
         }
       }
 
