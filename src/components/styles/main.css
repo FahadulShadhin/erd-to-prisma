@@ -461,3 +461,31 @@ input[type="checkbox"] {
 .btn-ghost {
   background: transparent;
 }
+
+/* Icon-only button for small image icons (used in modal actions) */
+.icon-btn {
+  position: relative;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn img {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.prisma-modal-actions .icon-btn:hover {
+  background: rgba(0,0,0,0.04);
+}
+
+.prisma-modal-actions .icon-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+}
+/* Using native title tooltips for icon buttons (no custom tooltip styles) */

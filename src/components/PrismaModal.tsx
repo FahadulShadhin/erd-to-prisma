@@ -1,3 +1,7 @@
+import copyIcon from '../assets/copy.svg'
+import downloadIcon from '../assets/download.svg'
+import closeIcon from '../assets/cross-rounded.svg'
+
 interface Props {
   open: boolean
   schema: string
@@ -34,9 +38,32 @@ export default function PrismaModal({ open, schema, onClose }: Props) {
         <div className="prisma-modal-header">
           <div className="prisma-modal-title">schema.prisma</div>
           <div className="prisma-modal-actions">
-            <button className="btn" onClick={handleCopy}>Copy</button>
-            <button className="btn" onClick={handleDownload}>Download</button>
-            <button className="btn btn-primary" onClick={onClose}>Close</button>
+            <button
+              className="btn icon-btn"
+              onClick={handleCopy}
+              aria-label="Copy schema to clipboard"
+              title="Copy"
+            >
+              <img src={copyIcon} alt="Copy" />
+            </button>
+
+            <button
+              className="btn icon-btn"
+              onClick={handleDownload}
+              aria-label="Download schema.prisma"
+              title="Download"
+            >
+              <img src={downloadIcon} alt="Download" />
+            </button>
+
+            <button
+              className="btn icon-btn"
+              onClick={onClose}
+              aria-label="Close modal"
+              title="Close"
+            >
+              <img src={closeIcon} alt="Close" />
+            </button>
           </div>
         </div>
         <div className="prisma-modal-body">
