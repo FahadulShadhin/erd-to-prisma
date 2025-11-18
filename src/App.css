@@ -49,11 +49,10 @@ html, body, #root {
 }
 
 .build-button {
-  border: 1px solid #333;
   background: #333;
   color: white;
   border-radius: 8px;
-  padding: 4px;
+  padding: 5px;
   cursor: pointer;
   user-select: none;
   display: flex;
