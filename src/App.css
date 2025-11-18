@@ -1,0 +1,112 @@
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 100px;
+  background: #f5f6fb;
+  border-right: 1px solid #e6e8ef;
+  padding: 12px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sidebar-title {
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.dnd-item {
+  border: 1px solid #333;
+  background: white;
+  border-radius: 8px;
+  padding: 4px;
+  cursor: grab;
+  user-select: none;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dnd-table-header {
+  text-align: center;
+  font-weight: 700;
+  padding: 0;
+  font-size: 12px;
+}
+
+.build-button {
+  border: 1px solid #333;
+  background: #333;
+  color: white;
+  border-radius: 8px;
+  padding: 4px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.2s, transform 0.2s;
+  outline: none;
+}
+
+.build-button:hover {
+  outline: none;
+  background: #555;
+  border: 1px solid #555;
+}
+
+.build-button:active {
+  outline: none;
+  transform: scale(0.98);
+  border: 1px solid #555;
+}
+
+.build-button span {
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.build-button img {
+  filter: brightness(0) invert(1);
+}
+
+.dnd-table-grid {
+  padding: 6px 0;
+}
+
+.dnd-table-cell {
+  display: inline-block;
+  width: calc(50% - 8px);
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+.dnd-bold { font-weight: 700; }
+.dnd-underline { text-decoration: underline; }
+
+.dnd-table-row {
+  padding: 6px 4px;
+  border-top: 1px solid #eee;
+  color: #444;
+}
+
+.canvas {
+  flex: 1;
+}
