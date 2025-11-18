@@ -42,7 +42,29 @@ export function generatePrismaSchema(nodes: Node[], edges: Edge[], datasourcePro
     const fields = (n.data?.fields ?? []) as Field[]
     for (const f of fields) {
       const prismaType = toPrismaType(f.type)
+      // normalize name and build default line
+      const normalized = String(f.name).toLowerCase().replace(/[_\s-]+/g, ' ')
       let line = `  ${f.name} ${prismaType}${f.nullable ? '?' : ''}`
+
+      // Special handling for common timestamp fields: createdAt / updatedAt
+      // If the field is a DateTime and its name looks like "created at" or
+      // "updated at" (including variants with underscores/dashes), emit a
+      // standardized Prisma field: `createdAt DateTime? @default(now())` or
+      // `updatedAt DateTime? @default(now()) @updatedAt` and skip other
+      // modifiers.
+      if (prismaType === 'DateTime') {
+        if (/created\s*at|createdat|created_at/.test(normalized)) {
+          line = `  createdAt DateTime? @default(now())`
+          models[modelName].fields.push(line)
+          continue
+        }
+
+        if (/updated\s*at|updatedat|updated_at/.test(normalized)) {
+          line = `  updatedAt DateTime? @default(now()) @updatedAt`
+          models[modelName].fields.push(line)
+          continue
+        }
+      }
 
       if (f.pk) {
         // Only emit defaults when the user explicitly chose a PK strategy.
