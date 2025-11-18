@@ -200,13 +200,18 @@ function FieldRow({ field, index, updateField, deleteRow }: FieldRowProps) {
             updateField(index, 'pk', isPk);
             if (isPk) {
               // When PK is checked, set unique to true, nullable to false
-              // and force the type to the auto-increment type.
-              updateField(index, 'type', 'Int_autoinc');
+              // and pick a sensible default PK type if current type
+              // isn't one of the PK strategies.
+              const pkTypes = ['Int_autoinc', 'String_cuid', 'String_uuid'];
+              if (!pkTypes.includes(field.type)) {
+                updateField(index, 'type', 'Int_autoinc');
+              }
               updateField(index, 'unique', true);
               updateField(index, 'nullable', false);
             } else {
               // If PK is removed and the field was the auto-inc type, reset to Int
-              if (field.type === 'Int_autoinc') {
+              const pkTypes = ['Int_autoinc', 'String_cuid', 'String_uuid'];
+              if (pkTypes.includes(field.type)) {
                 updateField(index, 'type', 'Int');
               }
             }
@@ -232,11 +237,14 @@ function FieldRow({ field, index, updateField, deleteRow }: FieldRowProps) {
           value={field.type}
           onChange={(e) => updateField(index, 'type', e.target.value)}
           className="field-select"
-          disabled={field.pk}
         >
-          {/* If this field is PK, show the auto-increment type only (disabled select). */}
+          {/* If this field is PK, show PK-strategy options (autoincrement, cuid, uuid). */}
           {field.pk ? (
-            <option value="Int_autoinc">Int (Auto Inc)</option>
+            <>
+              <option value="Int_autoinc">autoincrement</option>
+              <option value="String_cuid">cuid</option>
+              <option value="String_uuid">uuid</option>
+            </>
           ) : (
             <>
               <option value="String">String</option>

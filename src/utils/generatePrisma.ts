@@ -19,6 +19,8 @@ function toPrismaType(t: string) {
     Json: 'Json',
     Bytes: 'Bytes',
     Int_autoinc: 'Int',
+    String_cuid: 'String',
+    String_uuid: 'String',
   }
   return map[t] ?? t
 }
@@ -43,10 +45,23 @@ export function generatePrismaSchema(nodes: Node[], edges: Edge[], datasourcePro
       let line = `  ${f.name} ${prismaType}${f.nullable ? '?' : ''}`
 
       if (f.pk) {
-        if (prismaType === 'Int') {
+        // Choose default based on the explicit field type when possible.
+        // Supported PK strategies: Int_autoinc -> autoincrement(),
+        // String_cuid -> cuid(), String_uuid -> uuid().
+        if (f.type === 'Int_autoinc' || prismaType === 'Int') {
           line += ' @id @default(autoincrement())'
-        } else {
+        } else if (f.type === 'String_uuid') {
+          line += ' @id @default(uuid())'
+        } else if (f.type === 'String_cuid') {
           line += ' @id @default(cuid())'
+        } else {
+          // Fallback: if Prisma type is Int prefer autoincrement,
+          // otherwise use cuid() as a reasonable default.
+          if (prismaType === 'Int') {
+            line += ' @id @default(autoincrement())'
+          } else {
+            line += ' @id @default(cuid())'
+          }
         }
       }
 
