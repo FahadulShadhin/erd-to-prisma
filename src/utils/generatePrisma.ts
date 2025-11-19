@@ -30,8 +30,14 @@ function capitalize(s: string) {
   return s[0].toUpperCase() + s.slice(1)
 }
 
-export function generatePrismaSchema(nodes: Node[], edges: Edge[], datasourceProvider = 'postgresql') {
+export function generatePrismaSchema(
+  nodes: Node[],
+  edges: Edge[],
+  enums: { name: string; values: string[] }[] = [],
+  datasourceProvider = 'postgresql'
+) {
   const nodeById = Object.fromEntries(nodes.map(n => [n.id, n]))
+  const enumsMap: Record<string, string[]> = Object.fromEntries((enums || []).map(e => [e.name, e.values]))
   const models: Record<string, { fields: string[]; relationFields: string[] }> = {}
 
   // Initialize models and fields
@@ -84,6 +90,16 @@ export function generatePrismaSchema(nodes: Node[], edges: Edge[], datasourcePro
           line += ' @id'
         }
       }
+
+        // If this field's type is an enum we know about, and we didn't already
+        // add a @default (e.g., from PK strategy), set the default to the
+        // first enum value so generated schema has a sensible default.
+        if (enumsMap[prismaType] && enumsMap[prismaType].length > 0 && !line.includes('@default(')) {
+          const first = enumsMap[prismaType][0]
+          if (first) {
+            line += ` @default(${first})`
+          }
+        }
 
       if (f.unique && !f.pk) {
         line += ' @unique'
@@ -141,6 +157,16 @@ datasource db {
 
 `
 
+  const enumBlocks = (enums || [])
+    .map((e) => `enum ${e.name} {
+${e.values.map((v) => `  ${v}`).join('\n')}
+}
+`)
+    .join('\n')
+
+  // Ensure there's an extra blank line after enums so models are separated
+  const enumSection = enumBlocks ? enumBlocks + '\n' : ''
+
   const body = Object.entries(models).map(([name, { fields, relationFields }]) => {
     const all = [...fields, ...relationFields]
     return `model ${name} {
@@ -149,5 +175,5 @@ ${all.join('\n')}
 `
   }).join('\n')
 
-  return header + body
+  return header + enumSection + body
 }

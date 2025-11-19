@@ -1,13 +1,15 @@
 // TableNode.tsx
 
 import { Handle, Position } from "@xyflow/react";
-import { useState } from 'react';
+import React, { useState, useContext, useRef, useEffect, useLayoutEffect } from 'react';
+import ReactDOM from 'react-dom'
 import './styles/main.css';
 import trashIcon from '../assets/trash-can.svg';
 import minusIcon from '../assets/minus-rounded.svg';
 import plusRoundedIcon from '../assets/plus-rounded.svg';
 import plusIcon from '../assets/plus.svg';
 import crossIcon from '../assets/cross-rounded.svg';
+import { NodesContext } from '../context/NodesContext'
 
 export interface Field {
   name: string;
@@ -23,6 +25,7 @@ export interface TableNodeData {
   expanded: boolean;
   mode?: 'preview' | 'edit';
   fields: Field[];
+  openEnumModal?: (index: number, prevType?: string) => void;
   onToggle: () => void;
   updateField: (index: number, key: keyof Field, value: any) => void;
   addRow: () => void;
@@ -32,9 +35,10 @@ export interface TableNodeData {
   toggleMode?: () => void;
 }
 
-export default function TableNode({ data }: { data: TableNodeData }) {
+export default function TableNode({ id, data }: { id: string; data: TableNodeData }) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState(data.name);
+
 
   const handleNameDoubleClick = () => {
     setIsEditingName(true);
@@ -81,6 +85,7 @@ export default function TableNode({ data }: { data: TableNodeData }) {
       }
     }
   }
+
 
   return (
     <div className="table-node">
@@ -181,11 +186,13 @@ export default function TableNode({ data }: { data: TableNodeData }) {
           {data.fields.map((field, index) => (
             <FieldRow
               key={index}
+              nodeId={id}
               field={field}
               index={index}
               updateField={data.updateField}
               deleteRow={data.deleteRow}
               onPkToggle={handlePkToggle}
+              openEnumModal={data.openEnumModal}
             />
           ))}
 
@@ -200,19 +207,116 @@ export default function TableNode({ data }: { data: TableNodeData }) {
             </button>
           </div>
       </div>
+      
     </div>
   );
 }
 
 interface FieldRowProps {
+  nodeId: string;
   field: Field;
   index: number;
   updateField: (index: number, key: keyof Field, value: any) => void;
   deleteRow: (index: number) => void;
   onPkToggle?: (index: number, isPk: boolean) => void;
+  openEnumModal?: (index: number, prevType?: string) => void;
 }
+function FieldRow({ nodeId, field, index, updateField, deleteRow, onPkToggle, openEnumModal }: FieldRowProps) {
+  const ctx = useContext(NodesContext)
+  const enums = ctx?.enums ?? []
+  const removeEnum = (name?: string) => {
+    if (!name) return
+    ctx?.removeEnum && ctx.removeEnum(name)
+  }
 
-function FieldRow({ field, index, updateField, deleteRow, onPkToggle }: FieldRowProps) {
+  function TypeDropdown() {
+    // local open state removed: we use global open state from context so
+    // the dropdown survives React Flow node remounts
+    const buttonRef = useRef<HTMLButtonElement | null>(null)
+    const portalRef = useRef<HTMLDivElement | null>(null)
+    const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null)
+
+    const ignoreDocClickRef = useRef(false)
+
+    useEffect(() => {
+      function onDoc(e: MouseEvent) {
+        if (ignoreDocClickRef.current) {
+          // ignore the first click that opened the dropdown
+          ignoreDocClickRef.current = false
+          return
+        }
+
+        const target = e.target as Node | null
+        if (buttonRef.current && buttonRef.current.contains(target)) return
+        if (portalRef.current && portalRef.current.contains(target)) return
+        // close the globally-controlled dropdown
+        ctx?.closeFieldDropdown && ctx.closeFieldDropdown()
+      }
+      document.addEventListener('click', onDoc)
+      return () => document.removeEventListener('click', onDoc)
+    }, [])
+
+    // compute coords whenever the global open state for this field changes
+    const isOpenGlobally = ctx?.openDropdown?.nodeId === nodeId && ctx?.openDropdown?.fieldIndex === index
+    useLayoutEffect(() => {
+      if (isOpenGlobally && buttonRef.current) {
+        const r = buttonRef.current.getBoundingClientRect()
+        setCoords({ top: r.bottom + 6, left: r.left, width: Math.max(180, r.width) })
+      }
+    }, [isOpenGlobally])
+
+    const primitives = ['String', 'Int', 'Float', 'Boolean', 'DateTime', 'Json', 'Bytes']
+    const pkOptions = ['Int_autoinc', 'String_cuid', 'String_uuid']
+
+    const dropdown = (
+      <div
+        ref={portalRef}
+        className="type-dropdown"
+        style={coords ? { position: 'fixed', top: coords.top, left: coords.left, minWidth: coords.width } : { position: 'fixed' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {field.pk && pkOptions.map((p) => (
+          <div key={p} className="type-option" onClick={() => { updateField(index, 'type', p); ctx?.closeFieldDropdown && ctx.closeFieldDropdown() }}>
+            {p}
+          </div>
+        ))}
+        {primitives.map((p) => (
+          <div key={p} className="type-option" onClick={() => { updateField(index, 'type', p); ctx?.closeFieldDropdown && ctx.closeFieldDropdown() }}>
+            {p.toLowerCase()}
+          </div>
+        ))}
+        <div className="type-divider">Enums</div>
+        <div className="type-option create" onClick={() => { openEnumModal?.(index, field.type); ctx?.closeFieldDropdown && ctx.closeFieldDropdown() }}>+ Create enum...</div>
+        {enums.map((e) => (
+          <div key={e.name} className="type-option enum-option" onClick={() => { updateField(index, 'type', e.name); ctx?.closeFieldDropdown && ctx.closeFieldDropdown() }}>
+            <span className="enum-option-name">{e.name}</span>
+            <button className="type-option-delete" onClick={(ev) => { ev.stopPropagation(); removeEnum(e.name) }} title={`Delete ${e.name}`}>
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+    )
+    return (
+      <div className="type-select-wrapper" style={{ display: 'inline-block' }}>
+        <button
+          ref={buttonRef}
+          className="type-select-button"
+          onClick={() => ctx?.openFieldDropdown && ctx.openFieldDropdown(nodeId, index)}
+          onPointerDownCapture={(e: React.PointerEvent) => {
+            e.stopPropagation()
+            // prevent immediate doc click from closing
+            ignoreDocClickRef.current = true
+            ctx?.openFieldDropdown && ctx.openFieldDropdown(nodeId, index)
+          }}
+        >
+          {field.type}
+        </button>
+        {isOpenGlobally && ReactDOM.createPortal(dropdown, document.body)}
+      </div>
+    )
+  }
+
   return (
     <div className="field-row">
       {/* Primary Key Checkbox */}
@@ -254,37 +358,7 @@ function FieldRow({ field, index, updateField, deleteRow, onPkToggle }: FieldRow
 
       {/* Field Type */}
       <div className="field-cell type-cell">
-        <select
-          value={field.type}
-          onChange={(e) => updateField(index, 'type', e.target.value)}
-          className="field-select"
-        >
-          {/* If this field is PK, show PK-strategy options (autoincrement, cuid, uuid). */}
-          {field.pk ? (
-            <>
-              <option value="Int_autoinc">&#128477; auto inc</option>
-              <option value="String_cuid">&#128477; cuid</option>
-              <option value="String_uuid">&#128477; uuid</option>
-              <option value="String">string</option>
-              <option value="Int">int</option>
-              <option value="Float">float</option>
-              <option value="Boolean">boolean</option>
-              <option value="DateTime">datetime</option>
-              <option value="Json">json</option>
-              <option value="Bytes">bytes</option>
-            </>
-          ) : (
-            <>
-              <option value="String">string</option>
-              <option value="Int">int</option>
-              <option value="Float">float</option>
-              <option value="Boolean">boolean</option>
-              <option value="DateTime">datetime</option>
-              <option value="Json">json</option>
-              <option value="Bytes">bytes</option>
-            </>
-          )}
-        </select>
+        <TypeDropdown />
       </div>
 
       {/* Nullable Checkbox */}

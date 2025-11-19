@@ -38,7 +38,11 @@ export default function Sidebar() {
 
   const handleBuildPrisma = () => {
     if (nodesContext && nodesContext.nodes && nodesContext.edges) {
-      const schema = generatePrismaSchema(nodesContext.nodes as Node[], nodesContext.edges as Edge[])
+      const schema = generatePrismaSchema(
+        nodesContext.nodes as Node[],
+        nodesContext.edges as Edge[],
+        nodesContext.enums || []
+      )
       setSchema(schema)
       setOpen(true)
     } else {
@@ -67,6 +71,7 @@ export default function Sidebar() {
         <img src={buildIcon} alt="Build Prisma" style={{ width: '16px', height: '16px' }} />
         <span className="dnd-table-header">Prisma</span>
       </button>
+      {/* Enums list removed from sidebar per request */}
       <PrismaModal open={open} schema={schema} onClose={() => setOpen(false)} />
     </div>
   )

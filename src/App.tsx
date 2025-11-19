@@ -1,11 +1,12 @@
 import './App.css'
-import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState, ReactFlowProvider, useReactFlow } from '@xyflow/react'
+import { ReactFlow, Background, Controls, useNodesState, useEdgesState, ReactFlowProvider, useReactFlow } from '@xyflow/react'
 import type { Node, Edge, Connection } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import TableNode, { type TableNodeData, type Field } from './components/TableNode'
 import RelationEdge, { type RelationType } from './components/RelationEdge'
 import Sidebar from './components/Sidebar'
-import { useCallback, useMemo, useRef, useEffect } from 'react'
+import EnumModal from './components/EnumModal'
+import { useCallback, useMemo, useRef, useEffect, useState } from 'react'
 import { NodesContext } from './context/NodesContext'
 
 export { NodesContext }
@@ -29,17 +30,23 @@ function FlowCanvasWrapper() {
   const persisted = useMemo(() => {
     try {
       const raw = localStorage.getItem('erd-to-prisma:flow')
-      return raw ? JSON.parse(raw) : { nodes: [], edges: [] }
+      return raw ? JSON.parse(raw) : { nodes: [], edges: [], enums: [] }
     } catch (e) {
-      return { nodes: [], edges: [] }
+      return { nodes: [], edges: [], enums: [] }
     }
   }, [])
 
   const initialNodes: Node[] = persisted.nodes || []
   const initialEdges: Edge[] = persisted.edges || []
+  const initialEnums = persisted.enums || []
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const [enums, setEnums] = useState<Array<{ name: string; values: string[] }>>(initialEnums)
+  const [enumEditor, setEnumEditor] = useState<{ open: boolean; nodeId?: string; fieldIndex?: number; prevType?: string }>(
+    { open: false }
+  )
+  const [openDropdown, setOpenDropdown] = useState<{ nodeId: string; fieldIndex: number } | undefined>(undefined)
   const { screenToFlowPosition } = useReactFlow()
   const idRef = useRef(3)
   
@@ -94,11 +101,41 @@ function FlowCanvasWrapper() {
     [setEdges]
   )
 
+  const addEnum = (e: { name: string; values: string[] }) => {
+    setEnums((prev) => {
+      const others = prev.filter((x) => x.name !== e.name)
+      return [...others, e]
+    })
+  }
+
+  const removeEnum = (name: string) => {
+    setEnums((prev) => prev.filter((x) => x.name !== name))
+    // revert any fields that used this enum back to String
+    setNodes((nds) =>
+      nds.map((n) => {
+        const d = n.data as unknown as TableNodeData
+        if (!d || !d.fields) return n
+        const newFields = (d.fields || []).map((f) => (f.type === name ? { ...f, type: 'String' } : f))
+        return { ...n, data: { ...d, fields: newFields } }
+      })
+    )
+  }
+
+  const openEnumEditor = (nodeId: string, fieldIndex: number, prevType?: string) => {
+    setEnumEditor({ open: true, nodeId, fieldIndex, prevType })
+  }
+
+  const closeEnumEditor = () => setEnumEditor({ open: false })
+
+  const openFieldDropdown = (nodeId: string, fieldIndex: number) => setOpenDropdown({ nodeId, fieldIndex })
+  const closeFieldDropdown = () => setOpenDropdown(undefined)
+
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((node) => ({
       ...node,
       data: {
         ...(node.data as unknown as TableNodeData),
+        openEnumModal: (index: number, prevType?: string) => openEnumEditor(node.id, index, prevType),
         onToggle: () => {
           setNodes((nds) =>
             nds.map((n) =>
@@ -178,11 +215,13 @@ function FlowCanvasWrapper() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('erd-to-prisma:flow', JSON.stringify({ nodes, edges }))
+      localStorage.setItem('erd-to-prisma:flow', JSON.stringify({ nodes, edges, enums }))
     } catch (e) {
       // ignore storage errors (e.g., quota exceeded)
     }
-  }, [nodes, edges])
+  }, [nodes, edges, enums])
+
+  // Render EnumModal globally so it is not constrained by React Flow node layering
 
   const nodeTypes = useMemo(() => ({ tableNode: TableNode }), [])
   const edgeTypes = useMemo(() => ({ relation: RelationEdge }), []) as any
@@ -217,7 +256,7 @@ function FlowCanvasWrapper() {
   )
 
   return (
-    <NodesContext.Provider value={{ nodes: nodesWithCallbacks, edges }}>
+    <NodesContext.Provider value={{ nodes: nodesWithCallbacks, edges, enums, addEnum, removeEnum, enumEditor, openEnumEditor, closeEnumEditor, openDropdown, openFieldDropdown, closeFieldDropdown }}>
       <AppContent 
         nodes={nodesWithCallbacks}
         edges={edges}
@@ -229,6 +268,34 @@ function FlowCanvasWrapper() {
         edgeTypes={edgeTypes}
         onDrop={onDrop}
         onDragOver={onDragOver}
+      />
+
+      <EnumModal
+        open={!!enumEditor.open}
+        initialName={enumEditor.prevType && enums.find((e) => e.name === enumEditor.prevType) ? enumEditor.prevType : ''}
+        initialValues={enumEditor.prevType ? (enums.find((e) => e.name === enumEditor.prevType)?.values ?? []) : []}
+        onCancel={() => {
+          // simply close editor; we did not mutate node field yet
+          closeEnumEditor()
+        }}
+        onDone={({ name, values }) => {
+          // register enum globally and set the node's field type
+          addEnum({ name, values })
+          if (enumEditor.nodeId !== undefined && typeof enumEditor.fieldIndex === 'number') {
+            setNodes((nds) =>
+              nds.map((n) => {
+                if (n.id === enumEditor.nodeId) {
+                  const d = n.data as unknown as TableNodeData
+                  const newFields = [...(d.fields || [])]
+                  newFields[enumEditor.fieldIndex!] = { ...newFields[enumEditor.fieldIndex!], type: name }
+                  return { ...n, data: { ...d, fields: newFields } }
+                }
+                return n
+              })
+            )
+          }
+          closeEnumEditor()
+        }}
       />
     </NodesContext.Provider>
   )
@@ -268,7 +335,6 @@ function AppContent({
         >
           <Background />
           <Controls />
-          <MiniMap />
         </ReactFlow>
       </div>
     </>
