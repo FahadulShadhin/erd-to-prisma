@@ -37,7 +37,19 @@ export function generatePrismaSchema(
   datasourceProvider = 'postgresql'
 ) {
   const nodeById = Object.fromEntries(nodes.map(n => [n.id, n]))
-  const enumsMap: Record<string, string[]> = Object.fromEntries((enums || []).map(e => [e.name, e.values]))
+  // Determine which enums are actually referenced by fields in the nodes.
+  const referencedEnumNames = new Set<string>()
+  for (const n of nodes) {
+    const fields = (n.data?.fields ?? []) as Field[]
+    for (const f of fields) {
+      const prismaType = toPrismaType(f.type)
+      if ((enums || []).some((e) => e.name === prismaType)) referencedEnumNames.add(prismaType)
+    }
+  }
+
+  // Only include enums that are referenced somewhere to keep schema minimal
+  const filteredEnums = (enums || []).filter((e) => referencedEnumNames.has(e.name))
+  const enumsMap: Record<string, string[]> = Object.fromEntries(filteredEnums.map(e => [e.name, e.values]))
   const models: Record<string, { fields: string[]; relationFields: string[] }> = {}
 
   // Initialize models and fields
@@ -157,7 +169,7 @@ datasource db {
 
 `
 
-  const enumBlocks = (enums || [])
+  const enumBlocks = filteredEnums
     .map((e) => `enum ${e.name} {
 ${e.values.map((v) => `  ${v}`).join('\n')}
 }
