@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import plusIcon from '../assets/plus-rounded.svg'
 import crossIcon from '../assets/cross-rounded.svg'
 
@@ -92,8 +92,12 @@ export default function EnumModal({ open, initialName = '', initialValues = [], 
         </div>
 
         <div className="enum-modal-footer">
-          <button className="btn" onClick={onCancel}>Cancel</button>
-          <button className="btn primary" onClick={handleDone}>Done</button>
+          <button className="btn icon-btn secondary" onClick={onCancel} title="Cancel" aria-label="Cancel">
+            Cancel
+          </button>
+          <button className="btn icon-btn primary" onClick={handleDone} title="Done" aria-label="Done">
+            Done
+          </button>
         </div>
       </div>
     </div>

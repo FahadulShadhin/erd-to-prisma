@@ -526,7 +526,7 @@ input[type="checkbox"] {
 }
 
 .enum-modal {
-  width: min(520px, 95%);
+  width: min(420px, 95%);
   background: white;
   border-radius: 8px;
   box-shadow: 0 12px 30px rgba(0,0,0,0.25);
@@ -537,14 +537,33 @@ input[type="checkbox"] {
 .enum-modal-header { font-weight: 700; margin-bottom: 8px }
 .enum-modal-body { display: flex; flex-direction: column; gap: 8px }
 .enum-label { font-size: 13px; color: #333 }
-.enum-input { padding: 8px 10px; border: 1px solid #ced4da; border-radius: 6px; width: 100%; }
+.enum-input {
+  padding: 8px 10px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
 .enum-value-entry { display:flex; gap:8px; align-items:center }
 .enum-pills { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px }
 .enum-pill { background:#f1f3f5; color:#111; padding:4px 6px; border-radius:14px; display:inline-flex; gap:6px; align-items:center; font-size:13px }
 .pill-remove { background:transparent; border:none; padding:2px; display:flex; align-items:center; cursor:pointer; margin-left:4px }
 .pill-remove img { width:12px; height:12px; display:block }
 .enum-modal-footer { display:flex; justify-content:flex-end; gap:8px; margin-top:12px }
-.btn.primary { background:#333; color:white; border-color:#333 }
+.btn.primary { 
+  background:#333; 
+  color:white; 
+  border-color:#333;
+  padding: 4px 8px !important;
+  border-radius: 8px !important;
+  font-size: 14px;
+  font-weight: inherit;
+}
+
+.btn.secondary {
+  font-size: 14px;
+  font-weight: inherit;
+}
 
 /* Type dropdown styles (custom select) */
 .type-select-wrapper { display:inline-block }
