@@ -10,6 +10,27 @@
   z-index: 1;
 }
 
+/* Performance: reduce expensive repaints during drag by avoiding transitions
+   on layout properties and hinting the browser to promote nodes to their
+   own composite layer for smooth transforms. */
+.react-flow__node {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+.table-node {
+  /* disable heavy transitions while dragging/moving */
+  transition: box-shadow 0.05s linear, background 0.05s linear;
+}
+
+/* When nodes are being dragged (React Flow may add a class or :active state),
+   reduce effects even further; include common class names and :active */
+.react-flow__node.dragging,
+.react-flow__node--dragging,
+.react-flow__node:active {
+  box-shadow: none !important;
+}
+
 .table-header {
   display: flex;
   align-items: center;
@@ -134,7 +155,8 @@
   align-items: center;
   padding: 6px;
   border-radius: 4px;
-  transition: background 0.2s;
+  /* avoid transitions that trigger layout/paint during drag */
+  transition: background 0.12s;
 }
 
 .field-row:not(.header-row):hover {
@@ -557,4 +579,27 @@ input[type="checkbox"] {
 .react-flow__attribution,
 .reactflow__attribution {
   display: none !important;
+}
+
+/* Prevent accidental text selection while interacting with the canvas / dragging */
+.canvas,
+.react-flow,
+.react-flow__pane,
+.react-flow__renderer {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Keep inputs/selects/textareas inside nodes selectable */
+.canvas input,
+.canvas textarea,
+.canvas select,
+.table-node .table-name,
+.table-node .field-input {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
 }
