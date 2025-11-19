@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom'
 import { NodesContext } from '../context/NodesContext'
 import type { Field, UpdateFieldFn } from '../types'
+import crossIcon from '../assets/cross-rounded.svg'
 
 interface Props {
   nodeId: string
@@ -89,7 +90,7 @@ export default function TypeDropdown({ nodeId, index, field, updateField, openEn
         <div key={e.name} className="type-option enum-option" onClick={() => { updateField(index, 'type', e.name); ctx?.closeFieldDropdown && ctx.closeFieldDropdown() }}>
           <span className="enum-option-name">{e.name}</span>
           <button className="type-option-delete" onClick={(ev) => { ev.stopPropagation(); removeEnum(e.name) }} title={`Delete ${e.name}`}>
-            ×
+            <img src={crossIcon} alt={`Delete ${e.name}`} className="type-option-delete-icon" />
           </button>
         </div>
       ))}
