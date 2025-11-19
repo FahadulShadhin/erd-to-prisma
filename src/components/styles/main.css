@@ -574,6 +574,12 @@ input[type="checkbox"] {
 .enum-option { display:flex; align-items:center; justify-content:space-between }
 .type-option-delete { background:transparent; border:none; color:#888; padding:4px; cursor:pointer; font-size:12px }
 .type-option-delete:hover { color:#333 }
+/* icon inside enum delete button */
+.type-option-delete-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
 
 /* Hide the React Flow attribution watermark/text in the canvas */
 .react-flow__attribution,
