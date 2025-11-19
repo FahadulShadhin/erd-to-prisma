@@ -2,7 +2,8 @@ import './App.css'
 import { ReactFlow, Background, Controls, useNodesState, useEdgesState, ReactFlowProvider, useReactFlow } from '@xyflow/react'
 import type { Node, Edge, Connection } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import TableNode, { type TableNodeData, type Field } from './components/TableNode'
+import TableNode, { type TableNodeData } from './components/TableNode'
+import type { Field } from './types'
 import RelationEdge, { type RelationType } from './components/RelationEdge'
 import Sidebar from './components/Sidebar'
 import EnumModal from './components/EnumModal'
@@ -127,7 +128,16 @@ function FlowCanvasWrapper() {
 
   const closeEnumEditor = () => setEnumEditor({ open: false })
 
-  const openFieldDropdown = (nodeId: string, fieldIndex: number) => setOpenDropdown({ nodeId, fieldIndex })
+  // schedule the dropdown open on the next tick so the click event
+  // finishes propagation before the global open state changes. This
+  // avoids a race where the opening click is interpreted as an outside
+  // click and immediately closes the dropdown.
+  const openFieldDropdown = (nodeId: string, fieldIndex: number) => {
+    // include an `openedAt` timestamp so dropdown components can detect
+    // a recent open even if they remount during the state change.
+    const payload = { nodeId, fieldIndex, openedAt: Date.now() }
+    setTimeout(() => setOpenDropdown(payload), 0)
+  }
   const closeFieldDropdown = () => setOpenDropdown(undefined)
 
   const nodesWithCallbacks = useMemo(() => {

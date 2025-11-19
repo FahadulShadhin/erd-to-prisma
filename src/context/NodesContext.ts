@@ -21,7 +21,9 @@ export type NodesContextValue =
 			openEnumEditor: (nodeId: string, fieldIndex: number, prevType?: string) => void
 			closeEnumEditor: () => void
 			// dropdown for type select (persisted globally so re-mount won't close it)
-			openDropdown?: { nodeId: string; fieldIndex: number }
+			// `openedAt` is a timestamp (ms) set when dropdown was opened so
+			// consumers can detect recent opens even across remounts.
+			openDropdown?: { nodeId: string; fieldIndex: number; openedAt?: number }
 			openFieldDropdown: (nodeId: string, fieldIndex: number) => void
 			closeFieldDropdown: () => void
 		}
