@@ -12,24 +12,23 @@ html, body, #root {
 
 .sidebar {
   width: 100px;
-  background: #f5f6fb;
-  border-right: 1px solid #e6e8ef;
+  background: var(--color-bg);
+  border-right: 1px solid var(--color-border);
   padding: 12px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
 .sidebar-title {
   font-weight: 700;
-  color: #333;
+  color: var(--color-text);
   margin-bottom: 8px;
 }
 
 .dnd-item {
-  border: 1px solid #333;
-  background: white;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
   border-radius: 8px;
   padding: 4px;
   cursor: grab;
@@ -49,8 +48,8 @@ html, body, #root {
 }
 
 .build-button {
-  background: #333;
-  color: white;
+  background: var(--color-accent);
+  color: #fff;
   border-radius: 8px;
   padding: 5px;
   cursor: pointer;
@@ -66,18 +65,18 @@ html, body, #root {
 
 .build-button:hover {
   outline: none;
-  background: #555;
-  border: 1px solid #555;
+  background: color-mix(in srgb, var(--color-accent) 80%, black 20%);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 70%, black 30%);
 }
 
 .build-button:active {
   outline: none;
   transform: scale(0.98);
-  border: 1px solid #555;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 70%, black 30%);
 }
 
 .build-button span {
-  color: white;
+  color: #fff;
   font-size: 12px;
   font-weight: 700;
 }
@@ -92,8 +91,8 @@ html, body, #root {
 
 .sidebar-enums { margin-top: 8px }
 .enum-list { display:flex; flex-direction:column; gap:6px; max-height:240px; overflow:auto }
-.enum-item { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 8px; background:#fff; border-radius:6px; border:1px solid #e6e8ef }
-.enum-name { font-size:12px; color:#222; font-weight:600 }
+.enum-item { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 8px; background:var(--color-bg-secondary); border-radius:6px; border:1px solid var(--color-border) }
+.enum-name { font-size:12px; color:var(--color-text); font-weight:600 }
 .enum-delete-btn { background:transparent; border:none; padding:4px; cursor:pointer }
 
 .dnd-table-cell {
@@ -108,8 +107,8 @@ html, body, #root {
 
 .dnd-table-row {
   padding: 6px 4px;
-  border-top: 1px solid #eee;
-  color: #444;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
 }
 
 .canvas {

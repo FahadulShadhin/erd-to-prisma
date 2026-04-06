@@ -57,7 +57,7 @@ export default function RelationEdge({
 
   return (
     <>
-      <BaseEdge id={id} path={edgePath} style={{ stroke: '#333', strokeWidth: selected ? 2 : 1 }} />
+      <BaseEdge id={id} path={edgePath} style={{ stroke: 'var(--color-border)', strokeWidth: selected ? 2 : 1 }} />
       
       {/* Source Marker */}
       <text
@@ -65,7 +65,7 @@ export default function RelationEdge({
         y={sourceMarkerY}
         textAnchor="middle"
         dominantBaseline="middle"
-        style={{ fontSize: '14px', fontWeight: 'bold', fill: '#333', pointerEvents: 'none' }}
+        style={{ fontSize: '14px', fontWeight: 'bold', fill: 'var(--color-text)', pointerEvents: 'none' }}
       >
         {sourceLabel}
       </text>
@@ -76,7 +76,7 @@ export default function RelationEdge({
         y={targetMarkerY}
         textAnchor="middle"
         dominantBaseline="middle"
-        style={{ fontSize: '14px', fontWeight: 'bold', fill: '#333', pointerEvents: 'none' }}
+        style={{ fontSize: '14px', fontWeight: 'bold', fill: 'var(--color-text)', pointerEvents: 'none' }}
       >
         {targetLabel}
       </text>

@@ -1,7 +1,7 @@
 /* Table Node Styles */
 .table-node {
-  background: white;
-  border: 1px solid #333;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   min-width: 400px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -36,7 +36,7 @@
   align-items: center;
   gap: 8px;
   padding: 12px;
-  background: #f8f9fa;
+  background: var(--color-bg-tertiary);
   border-radius: inherit;
 }
 
@@ -59,7 +59,7 @@
 
 .collapse-btn:hover {
   opacity: 1;
-  background: #f7f7f7;
+  background: var(--color-bg-tertiary);
 }
 
 .collapse-btn:focus {
@@ -82,10 +82,11 @@
   padding: 4px 8px;
   border-radius: 4px;
   transition: background 0.2s;
+  color: var(--color-text);
 }
 
 .table-name:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--color-border);
 }
 
 .table-name-input {
@@ -93,9 +94,11 @@
   font-weight: bold;
   font-size: 16px;
   padding: 4px 8px;
-  border: 1px solid #007bff;
+  border: 1px solid var(--color-accent);
   border-radius: 4px;
   outline: none;
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
 }
 
 .delete-table-btn {
@@ -103,7 +106,7 @@
   height: 24px;
   border: none;
   background: transparent;
-  color: #333;
+  color: var(--color-text);
   border-radius: 4px;
   cursor: pointer;
   font-size: 16px;
@@ -118,7 +121,7 @@
 
 .delete-table-btn:hover {
   opacity: 1;
-  background: #f7f7f7;
+  background: var(--color-bg-tertiary);
 }
 
 .delete-table-btn:focus {
@@ -160,14 +163,14 @@
 }
 
 .field-row:not(.header-row):hover {
-  background: #f8f9fa;
+  background: var(--color-bg-tertiary);
 }
 
 .header-row {
   font-weight: bold;
   font-size: 12px;
-  color: #666;
-  border-bottom: 1px solid #dee2e6;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border);
   padding-bottom: 8px;
   margin-bottom: 4px;
 }
@@ -197,28 +200,30 @@
 .field-select {
   width: 100%;
   padding: 6px 8px;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   font-size: 14px;
   transition: all 0.2s;
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
 }
 
 .field-input:focus,
 .field-select:focus {
   outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 1px rgba(0, 123, 255, 0.1);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 .field-input::placeholder {
-  color: #adb5bd;
+  color: var(--color-text-secondary);
 }
 
 input[type="checkbox"] {
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #333;
+  accent-color: var(--color-text);
 }
 
 .delete-row-btn {
@@ -237,7 +242,7 @@ input[type="checkbox"] {
 }
 
 .delete-row-btn:hover {
-  background: #f7f7f7;
+  background: var(--color-bg-tertiary);
   transform: scale(1.1);
 }
 
@@ -250,7 +255,7 @@ input[type="checkbox"] {
   margin-top: 20px;
   padding-top: 0;
   /* padding-bottom: 8px; */
-  border-top: 1px solid #dee2e6;
+  border-top: 1px solid var(--color-border);
   display: flex;
   justify-content: center;
   position: relative;
@@ -263,7 +268,7 @@ input[type="checkbox"] {
   height: 28px;
   padding: 0;
   border: none;
-  background: white;
+  background: var(--color-bg-secondary);
   border-radius: 50%;
   cursor: pointer;
   display: flex;
@@ -282,7 +287,7 @@ input[type="checkbox"] {
 }
 
 .add-row-btn:hover {
-  background-color: #f7f7f7;
+  background-color: var(--color-bg-tertiary);
   transform: scale(1.1);
 }
 
@@ -303,8 +308,8 @@ input[type="checkbox"] {
 .connection-handle {
   width: 10px;
   height: 10px;
-  background: #007bff;
-  border: 2px solid white;
+  background: var(--color-accent);
+  border: 2px solid var(--color-bg-secondary);
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -327,8 +332,8 @@ input[type="checkbox"] {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: white;
-  border: 2px solid #333;
+  background: var(--color-bg-secondary);
+  border: 2px solid var(--color-border);
   font-size: 11px;
   font-weight: bold;
   cursor: pointer;
@@ -341,23 +346,23 @@ input[type="checkbox"] {
 }
 
 .relation-circle-button:hover {
-  background: #f5f5f5;
+  background: var(--color-bg-tertiary);
   transform: scale(1.1);
-  border: 2px solid #333;
+  border: 2px solid var(--color-border);
 }
 
 .relation-circle-button:focus {
   outline: none;
-  border: 2px solid #333;
+  border: 2px solid var(--color-border);
 }
 
 .relation-selector-expanded {
   display: flex;
   gap: 4px;
-  background: white;
+  background: var(--color-bg-secondary);
   padding: 4px;
   border-radius: 16px;
-  border: 2px solid #333;
+  border: 2px solid var(--color-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   animation: expandSelector 0.2s ease;
 }
@@ -382,12 +387,12 @@ input[type="checkbox"] {
   font-weight: bold;
   cursor: pointer;
   transition: all 0.15s ease;
-  color: #666;
+  color: var(--color-text-secondary);
   outline: none;
 }
 
 .relation-option:hover {
-  background: #f0f0f0;
+  background: var(--color-bg-tertiary);
 }
 
 .relation-option:focus {
@@ -395,8 +400,8 @@ input[type="checkbox"] {
 }
 
 .relation-option.active {
-  background: #333;
-  color: white;
+  background: var(--color-accent);
+  color: #fff;
 }
 
 /* Prisma Schema Modal */
@@ -413,7 +418,8 @@ input[type="checkbox"] {
 .prisma-modal {
   width: min(900px, 95%);
   max-height: 85vh;
-  background: white;
+  background: var(--color-modal-bg);
+  color: var(--color-text);
   border-radius: 8px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.3);
   overflow: hidden;
@@ -423,7 +429,7 @@ input[type="checkbox"] {
 
 .prisma-modal-header {
   padding: 12px 16px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -441,7 +447,7 @@ input[type="checkbox"] {
 
 .prisma-modal-body {
   padding: 12px;
-  background: #fafafa;
+  background: var(--color-modal-body);
   /* allow the body to grow and scroll within modal */
   flex: 1 1 auto;
   overflow: auto;
@@ -453,7 +459,7 @@ input[type="checkbox"] {
   width: 100%;
   /* limit height so modal header/actions stay visible */
   max-height: calc(85vh - 120px);
-  border: 1px solid #e6e6e6;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace;
@@ -463,7 +469,7 @@ input[type="checkbox"] {
   word-break: break-word;
   overflow-wrap: anywhere;
   box-sizing: border-box;
-  background: #fff;
+  background: var(--color-bg-secondary);
   overflow-x: hidden; /* prevent horizontal scrollbar */
   overflow-y: auto;
 }
@@ -471,15 +477,15 @@ input[type="checkbox"] {
 .btn {
   padding: 8px 12px;
   border-radius: 6px;
-  border: 1px solid #ddd;
-  background: white;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
   cursor: pointer;
 }
 
 .btn-primary {
-  background: #333;
-  color: white;
-  border-color: #333;
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
 }
 
 .btn-ghost {
@@ -527,7 +533,7 @@ input[type="checkbox"] {
 
 .enum-modal {
   width: min(420px, 95%);
-  background: white;
+  background: var(--color-bg-secondary);
   border-radius: 8px;
   box-shadow: 0 12px 30px rgba(0,0,0,0.25);
   overflow: hidden;
@@ -536,24 +542,24 @@ input[type="checkbox"] {
 
 .enum-modal-header { font-weight: 700; margin-bottom: 8px }
 .enum-modal-body { display: flex; flex-direction: column; gap: 8px }
-.enum-label { font-size: 13px; color: #333 }
+.enum-label { font-size: 13px; color: var(--color-text) }
 .enum-input {
   padding: 8px 10px;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   width: 100%;
   box-sizing: border-box;
 }
 .enum-value-entry { display:flex; gap:8px; align-items:center }
 .enum-pills { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px }
-.enum-pill { background:#f1f3f5; color:#111; padding:4px 6px; border-radius:14px; display:inline-flex; gap:6px; align-items:center; font-size:13px }
+.enum-pill { background:var(--color-bg-tertiary); color:var(--color-text); padding:4px 6px; border-radius:14px; display:inline-flex; gap:6px; align-items:center; font-size:13px }
 .pill-remove { background:transparent; border:none; padding:2px; display:flex; align-items:center; cursor:pointer; margin-left:4px }
 .pill-remove img { width:12px; height:12px; display:block }
 .enum-modal-footer { display:flex; justify-content:flex-end; gap:8px; margin-top:12px }
 .btn.primary { 
-  background:#333; 
-  color:white; 
-  border-color:#333;
+  background: var(--color-accent); 
+  color: #fff; 
+  border-color: var(--color-accent);
   padding: 4px 8px !important;
   border-radius: 8px !important;
   font-size: 14px;
@@ -569,9 +575,9 @@ input[type="checkbox"] {
 .type-select-wrapper { display:inline-block }
 .type-select-button { 
   padding:4px 8px; 
-  border:1px solid #ced4da; 
+  border:1px solid var(--color-border); 
   border-radius:4px; 
-  background:white; 
+  background:var(--color-bg-secondary); 
   cursor:pointer;
   font-weight: inherit;
   font-size: 14px;
@@ -583,16 +589,16 @@ input[type="checkbox"] {
 .type-select-button:focus-visible {
   outline: none !important;
   box-shadow: none !important;
-  border: 1px solid #ced4da !important;
+  border: 1px solid var(--color-border) !important;
 }
-.type-dropdown { position:absolute; top:calc(100% + 6px); left:0; background:white; border:1px solid #e6e8ef; box-shadow:0 6px 18px rgba(0,0,0,0.08); border-radius:8px; min-width:180px; z-index:9000; max-height:260px; overflow:auto }
+.type-dropdown { position:absolute; top:calc(100% + 6px); left:0; background:var(--color-bg-secondary); border:1px solid var(--color-border); box-shadow:0 6px 18px rgba(0,0,0,0.08); border-radius:8px; min-width:180px; z-index:9000; max-height:260px; overflow:auto }
 .type-option { padding:8px 10px; cursor:pointer; display:flex; align-items:center; justify-content:space-between }
-.type-option:hover { background:#f5f7fb }
-.type-divider { padding:8px 10px; font-size:12px; color:#666; border-top:1px dashed #eee }
-.type-option.create { font-weight:600; color:#0b66ff }
+.type-option:hover { background:var(--color-bg-tertiary) }
+.type-divider { padding:8px 10px; font-size:12px; color:var(--color-text-secondary); border-top:1px dashed var(--color-border) }
+.type-option.create { font-weight:600; color:var(--color-accent) }
 .enum-option { display:flex; align-items:center; justify-content:space-between }
-.type-option-delete { background:transparent; border:none; color:#888; padding:4px; cursor:pointer; font-size:12px }
-.type-option-delete:hover { color:#333 }
+.type-option-delete { background:transparent; border:none; color:var(--color-text-secondary); padding:4px; cursor:pointer; font-size:12px }
+.type-option-delete:hover { color:var(--color-text) }
 /* icon inside enum delete button */
 .type-option-delete-icon {
   width: 14px;
@@ -627,4 +633,57 @@ input[type="checkbox"] {
   -moz-user-select: text;
   -ms-user-select: text;
   user-select: text;
+}
+
+/* Override React Flow Controls to respect theme variables */
+.react-flow__controls {
+  background: transparent;
+  padding: 0;
+  box-shadow: none !important;
+}
+
+.react-flow__controls button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  margin: 4px 0;
+  border-radius: 6px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  cursor: pointer;
+}
+
+.react-flow__controls button:hover {
+  background: var(--color-bg-tertiary);
+}
+
+/* SVG icons inside controls */
+.react-flow__controls button svg,
+.react-flow__controls button img {
+  width: 16px;
+  height: 16px;
+}
+
+.react-flow__controls button svg path,
+.react-flow__controls button svg circle,
+.react-flow__controls button svg rect {
+  fill: var(--color-text);
+  stroke: none;
+}
+
+/* Active/selected control (if library adds active class) */
+.react-flow__controls button.react-flow__controls-button--active,
+.react-flow__controls button:active {
+  background: var(--color-accent);
+}
+
+.react-flow__controls button.react-flow__controls-button--active svg path,
+.react-flow__controls button:active svg path {
+  fill: #fff;
+}
+
+.react-flow__panel {
+  margin: 5px;
 }

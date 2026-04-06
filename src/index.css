@@ -1,16 +1,44 @@
 :root {
+
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
+  /* Color variables for theming */
+  --color-bg: #f5f6fb;
+  --color-bg-secondary: #fff;
+  --color-bg-tertiary: #f8f9fa;
+  --color-text: #222;
+  --color-text-secondary: #666;
+  --color-border: #e6e8ef;
+  --color-accent: #007bff;
+  --color-modal-bg: #fff;
+  --color-modal-body: #fafafa;
+
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color: var(--color-text);
+  background-color: var(--color-bg);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #181a20;
+    --color-bg-secondary: #23262f;
+    --color-bg-tertiary: #23262f;
+    --color-text: #f5f6fa;
+    --color-text-secondary: #b0b3c6;
+    --color-border: #353945;
+    --color-accent: #4f8cff;
+    --color-modal-bg: #23262f;
+    --color-modal-body: #181a20;
+    color: var(--color-text);
+    background-color: var(--color-bg);
+  }
 }
 
 a {
