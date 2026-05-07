@@ -40,6 +40,10 @@ html, body, #root {
   gap: 6px;
 }
 
+.dnd-item img {
+  filter: var(--filter);
+}
+
 .dnd-table-header {
   text-align: center;
   font-weight: 700;
