@@ -1,5 +1,4 @@
 import indexTpl from '../templates/express/index.js?raw'
-import routesIndexTpl from '../templates/express/routes/index.js?raw'
 import routeTpl from '../templates/express/routes/{{modelPlural}}.js?raw'
 import controllerTpl from '../templates/express/controllers/{{modelLower}}Controller.js?raw'
 import serviceTpl from '../templates/express/services/{{modelLower}}Service.js?raw'
