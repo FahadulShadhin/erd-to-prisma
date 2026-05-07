@@ -72,6 +72,7 @@
 .collapse-icon {
   width: 20px;
   height: 20px;
+  filter: var(--filter);
 }
 
 .table-name {
@@ -135,6 +136,7 @@
 .delete-table-icon {
   width: 20px;
   height: 20px;
+  filter: var(--filter);
 }
 
 .table-body {
@@ -249,6 +251,7 @@ input[type="checkbox"] {
 .delete-icon {
   width: 18px;
   height: 18px;
+  filter: var(--filter);
 }
 
 .add-row-container {
@@ -302,6 +305,7 @@ input[type="checkbox"] {
 .add-row-icon {
   width: 20px;
   height: 20px;
+  filter: var(--filter);
 }
 
 /* React Flow Handles */
@@ -400,6 +404,10 @@ input[type="checkbox"] {
   justify-content: center;
   gap: 8px;
   min-width: 140px;
+}
+
+.fixed-width-btn img {
+  filter: var(--filter);
 }
 
 .relation-option {
@@ -532,6 +540,7 @@ input[type="checkbox"] {
   width: 20px;
   height: 20px;
   display: block;
+  filter: var(--filter);
 }
 
 .prisma-modal-actions .icon-btn:hover {

@@ -36,6 +36,7 @@
     --color-accent: #4f8cff;
     --color-modal-bg: #23262f;
     --color-modal-body: #181a20;
+    --filter: brightness(0) invert(1);
     color: var(--color-text);
     background-color: var(--color-bg);
   }
