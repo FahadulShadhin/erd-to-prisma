@@ -1,5 +1,6 @@
 import './styles/main.css'
-import type { TableNodeData, Field } from './TableNode'
+import type { TableNodeData } from './TableNode'
+import type { Field } from '../types';
 import dragIcon from '../assets/drag.svg';
 import buildIcon from '../assets/build.svg';
 import type { Node, Edge } from '@xyflow/react'
