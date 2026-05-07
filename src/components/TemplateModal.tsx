@@ -10,10 +10,10 @@ interface Props {
 export default function TemplateModal({ open, schema, onClose }: Props) {
   if (!open) return null
 
-  const handleExpress = async () => {
+  const handleExpress = async (typescript: boolean) => {
     try {
-      // Generate template files map from schema
-      const files = generateExpressTemplates(schema, { appName: 'prisma-express-app' })
+      // Generate template files map from schema using selected language
+      const files = await generateExpressTemplates(schema, { appName: 'prisma-express-app', typescript })
 
       // Load JSZip (try local, fallback to CDN if needed)
       let JSZip: any
@@ -56,9 +56,12 @@ export default function TemplateModal({ open, schema, onClose }: Props) {
         </div>
         <div className="prisma-modal-body">
           <p>Select a template to generate the project boilerplate from your schema.</p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn" onClick={handleExpress} title="Express.js">
-              Express
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="btn" onClick={() => handleExpress(false)} title="Express + JS">
+              Express + JS
+            </button>
+            <button className="btn" onClick={() => handleExpress(true)} title="Express + TS">
+              Express + TS
             </button>
           </div>
         </div>
