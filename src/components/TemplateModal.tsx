@@ -1,5 +1,5 @@
 import closeIcon from '../assets/cross-rounded.svg'
-import generateExpressTemplates from '../utils/templateGenerator'
+import generateExpressTemplates from '../utils/generateTemplates'
 
 interface Props {
   open: boolean
