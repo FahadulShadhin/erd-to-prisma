@@ -58,7 +58,7 @@ export default function TemplateModal({ open, schema, onClose }: Props) {
           <p>Select a template to generate the project boilerplate from your schema.</p>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn" onClick={handleExpress} title="Express.js">
-              express.js
+              Express
             </button>
           </div>
         </div>

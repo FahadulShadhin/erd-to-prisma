@@ -2,7 +2,7 @@ import { useState } from 'react'
 import copyIcon from '../assets/copy.svg'
 import downloadIcon from '../assets/download.svg'
 import closeIcon from '../assets/cross-rounded.svg'
-import codeIcon from '../assets/code.svg'
+import codeIcon from '../assets/code1.svg'
 import TemplateModal from './TemplateModal'
 
 interface Props {
@@ -67,7 +67,7 @@ export default function PrismaModal({ open, schema, onClose }: Props) {
               aria-label="Open template modal"
               title="Template"
             >
-              <img src={codeIcon} alt="Template" style={{ width: '16px', height: '16px' }} />
+              <img src={codeIcon} alt="Template" />
             </button>
 
             <button
