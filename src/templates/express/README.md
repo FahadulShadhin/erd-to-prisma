@@ -1,0 +1,1 @@
+# {{appName}}\n\nThis is a generated Prisma + Express template.\n\n- Run `npm install`\n- Set `DATABASE_URL` in `.env`\n- Run `npx prisma generate`\n- Run `npm start`\n\n*** End Patch

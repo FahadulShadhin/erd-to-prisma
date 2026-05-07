@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import copyIcon from '../assets/copy.svg'
 import downloadIcon from '../assets/download.svg'
 import closeIcon from '../assets/cross-rounded.svg'
+import codeIcon from '../assets/code.svg'
+import TemplateModal from './TemplateModal'
 
 interface Props {
   open: boolean
@@ -9,6 +12,8 @@ interface Props {
 }
 
 export default function PrismaModal({ open, schema, onClose }: Props) {
+  const [templateOpen, setTemplateOpen] = useState(false)
+
   if (!open) return null
 
   const handleCopy = async () => {
@@ -58,6 +63,15 @@ export default function PrismaModal({ open, schema, onClose }: Props) {
 
             <button
               className="btn icon-btn"
+              onClick={() => setTemplateOpen(true)}
+              aria-label="Open template modal"
+              title="Template"
+            >
+              <img src={codeIcon} alt="Template" style={{ width: '16px', height: '16px' }} />
+            </button>
+
+            <button
+              className="btn icon-btn"
               onClick={onClose}
               aria-label="Close modal"
               title="Close"
@@ -70,6 +84,7 @@ export default function PrismaModal({ open, schema, onClose }: Props) {
           <pre className="prisma-schema-textarea" tabIndex={0}>{schema}</pre>
         </div>
       </div>
+      <TemplateModal open={templateOpen} schema={schema} onClose={() => setTemplateOpen(false)} />
     </div>
   )
 }
