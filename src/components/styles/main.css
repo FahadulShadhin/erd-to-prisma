@@ -378,6 +378,30 @@ input[type="checkbox"] {
   }
 }
 
+/* Small spinner used in template generation buttons */
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  display: inline-block;
+  vertical-align: middle;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Fixed width button variant used when content may change during async actions */
+.fixed-width-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 140px;
+}
+
 .relation-option {
   padding: 6px 12px;
   border: none;

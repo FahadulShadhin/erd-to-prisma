@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import closeIcon from '../assets/cross-rounded.svg'
+import loaderIcon from '../assets/loader.svg'
 import generateExpressTemplates from '../utils/generateTemplates'
 
 interface Props {
@@ -9,9 +11,11 @@ interface Props {
 
 export default function TemplateModal({ open, schema, onClose }: Props) {
   if (!open) return null
+  const [generating, setGenerating] = useState<'js' | 'ts' | null>(null)
 
   const handleExpress = async (typescript: boolean) => {
     try {
+      setGenerating(typescript ? 'ts' : 'js')
       // Generate template files map from schema using selected language
       const files = await generateExpressTemplates(schema, { appName: 'prisma-express-app', typescript })
 
@@ -41,6 +45,9 @@ export default function TemplateModal({ open, schema, onClose }: Props) {
     } catch (err) {
       console.error('Failed to generate template', err)
     }
+    finally {
+      setGenerating(null)
+    }
   }
 
   return (
@@ -57,11 +64,37 @@ export default function TemplateModal({ open, schema, onClose }: Props) {
         <div className="prisma-modal-body">
           <p>Select a template to generate the project boilerplate from your schema.</p>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button className="btn" onClick={() => handleExpress(false)} title="Express + JS">
-              Express + JS
+            <button
+              className="btn fixed-width-btn"
+              onClick={() => handleExpress(false)}
+              title="Express + JS"
+              disabled={!!generating}
+              aria-busy={generating === 'js'}
+            >
+              {generating === 'js' ? (
+                <>
+                  <img src={loaderIcon} alt="loading" className="loading-spinner" />
+                  Generating...
+                </>
+              ) : (
+                'Express + JS'
+              )}
             </button>
-            <button className="btn" onClick={() => handleExpress(true)} title="Express + TS">
-              Express + TS
+            <button
+              className="btn fixed-width-btn"
+              onClick={() => handleExpress(true)}
+              title="Express + TS"
+              disabled={!!generating}
+              aria-busy={generating === 'ts'}
+            >
+              {generating === 'ts' ? (
+                <>
+                  <img src={loaderIcon} alt="loading" className="loading-spinner" />
+                  Generating...
+                </>
+              ) : (
+                'Express + TS'
+              )}
             </button>
           </div>
         </div>

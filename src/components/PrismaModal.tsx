@@ -67,7 +67,7 @@ export default function PrismaModal({ open, schema, onClose }: Props) {
               aria-label="Open template modal"
               title="Template"
             >
-              <img src={codeIcon} alt="Template" />
+              <img src={codeIcon} alt="Generate Template" />
             </button>
 
             <button
