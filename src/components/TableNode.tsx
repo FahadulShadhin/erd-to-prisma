@@ -169,7 +169,7 @@ export default function TableNode({ id, data }: { id: string; data: TableNodeDat
           <div className="field-cell pk-cell">PK</div>
           <div className="field-cell name-cell">Name</div>
           <div className="field-cell type-cell">Type</div>
-          <div className="field-cell nullable-cell">?</div>
+          <div className="field-cell nullable-cell">Null</div>
           <div className="field-cell unique-cell">Unique</div>
           <div className="field-cell actions-cell"></div>
         </div>
