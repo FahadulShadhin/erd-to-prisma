@@ -327,6 +327,12 @@ function AppContent({
     <>
       <Sidebar />
       <div className="canvas">
+        {nodes.length === 0 && (
+          <div className="canvas-empty-state">
+            <strong>Drag an Entity here to get started.</strong>
+            <span>Add fields and connect entities, then select Prisma to generate your schema.</span>
+          </div>
+        )}
         <ReactFlow
           nodes={nodes}
           edges={edges}
