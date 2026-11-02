@@ -32,7 +32,7 @@ function getInitialTableData(): TableNodeData {
   }
 }
 
-export default function Sidebar() {
+export default function Sidebar({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleTheme: () => void }) {
   const nodesContext = useContext(NodesContext)
   const [schema, setSchema] = useState<string>('')
   const [open, setOpen] = useState(false)
@@ -71,6 +71,22 @@ export default function Sidebar() {
       <button className="build-button" onClick={handleBuildPrisma}>
         <img src={buildIcon} alt="Build Prisma" style={{ width: '16px', height: '16px' }} />
         <span className="dnd-table-header">Prisma</span>
+      </button>
+      <button
+        className="theme-toggle"
+        type="button"
+        onClick={onToggleTheme}
+        aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+        title={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24"        >
+          {theme === 'light' ? (
+            <path d="M12 3v2m0 14v2M5.64 5.64l1.42 1.42m9.88 9.88 1.42 1.42M3 12h2m14 0h2M5.64 18.36l1.42-1.42m9.88-9.88 1.42-1.42M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />
+          ) : (
+            <path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z" />
+          )}
+        </svg>
+        <span>{theme === 'light' ? 'Dark' : 'Light'}</span>
       </button>
       {/* Enums list removed from sidebar per request */}
       <PrismaModal open={open} schema={schema} onClose={() => setOpen(false)} />

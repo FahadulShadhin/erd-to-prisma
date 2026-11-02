@@ -89,6 +89,34 @@ html, body, #root {
   filter: brightness(0) invert(1);
 }
 
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: auto;
+  padding: 6px 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  font-size: 12px;
+}
+
+.theme-toggle:hover {
+  border-color: var(--color-accent);
+}
+
+.theme-toggle svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
 .dnd-table-grid {
   padding: 6px 0;
 }

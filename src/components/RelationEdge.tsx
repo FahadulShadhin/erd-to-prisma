@@ -57,7 +57,7 @@ export default function RelationEdge({
 
   return (
     <>
-      <BaseEdge id={id} path={edgePath} style={{ stroke: 'var(--color-border)', strokeWidth: selected ? 2 : 1 }} />
+      <BaseEdge id={id} path={edgePath} style={{ stroke: 'var(--color-relation-edge)', strokeWidth: selected ? 2 : 1 }} />
       
       {/* Source Marker */}
       <text

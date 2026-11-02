@@ -10,6 +10,9 @@ import EnumModal from './components/EnumModal'
 import { useCallback, useMemo, useRef, useEffect, useState } from 'react'
 import { NodesContext } from './context/NodesContext'
 
+type Theme = 'light' | 'dark'
+const THEME_STORAGE_KEY = 'erd-to-prisma:theme'
+
 export { NodesContext }
 
 export const useNodesData = () => {
@@ -18,16 +21,39 @@ export const useNodesData = () => {
 }
 
 export default function App() {
+  const [theme, setTheme] = useState<Theme>(() => {
+    try {
+      const savedTheme = localStorage.getItem(THEME_STORAGE_KEY)
+      if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme
+    } catch (error) {
+      console.error('Unable to read the saved theme preference.', error)
+    }
+
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  })
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme)
+    } catch (error) {
+      console.error('Unable to save the theme preference.', error)
+    }
+  }, [theme])
+
   return (
     <div className="app-container">
       <ReactFlowProvider>
-        <FlowCanvasWrapper />
+        <FlowCanvasWrapper
+          theme={theme}
+          onToggleTheme={() => setTheme((currentTheme) => currentTheme === 'light' ? 'dark' : 'light')}
+        />
       </ReactFlowProvider>
     </div>
   )
 }
 
-function FlowCanvasWrapper() {
+function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
   const persisted = useMemo(() => {
     try {
       const raw = localStorage.getItem('erd-to-prisma:flow')
@@ -268,6 +294,8 @@ function FlowCanvasWrapper() {
   return (
     <NodesContext.Provider value={{ nodes: nodesWithCallbacks, edges, enums, addEnum, removeEnum, enumEditor, openEnumEditor, closeEnumEditor, openDropdown, openFieldDropdown, closeFieldDropdown }}>
       <AppContent 
+        theme={theme}
+        onToggleTheme={onToggleTheme}
         nodes={nodesWithCallbacks}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -312,6 +340,8 @@ function FlowCanvasWrapper() {
 }
 
 function AppContent({ 
+  theme,
+  onToggleTheme,
   nodes, 
   edges, 
   onNodesChange, 
@@ -325,7 +355,7 @@ function AppContent({
 }: any) {
   return (
     <>
-      <Sidebar />
+      <Sidebar theme={theme} onToggleTheme={onToggleTheme} />
       <div className="canvas">
         {nodes.length === 0 && (
           <div className="canvas-empty-state">
@@ -334,6 +364,7 @@ function AppContent({
           </div>
         )}
         <ReactFlow
+          colorMode={theme}
           nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
