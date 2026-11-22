@@ -7,4 +7,9 @@ export interface Field {
   unique: boolean;
 }
 
+export interface DiagramListItem {
+  id: string;
+  name: string;
+}
+
 export type UpdateFieldFn = (index: number, key: keyof Field, value: any) => void;

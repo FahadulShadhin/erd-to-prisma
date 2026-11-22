@@ -3,11 +3,13 @@ import type { TableNodeData } from './TableNode'
 import type { Field } from '../types';
 import dragIcon from '../assets/drag.svg';
 import buildIcon from '../assets/build.svg';
+import trashIcon from '../assets/trash-can.svg';
 import type { Node, Edge } from '@xyflow/react'
 import { useContext, useState } from 'react'
 import { NodesContext } from '../context/NodesContext'
 import { generatePrismaSchema } from '../utils/generatePrisma'
 import PrismaModal from './PrismaModal'
+import type { DiagramListItem } from '../types'
 
 function getInitialTableData(): TableNodeData {
   const fields: Field[] = [
@@ -32,10 +34,46 @@ function getInitialTableData(): TableNodeData {
   }
 }
 
-export default function Sidebar({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleTheme: () => void }) {
+type SidebarProps = {
+  theme: 'light' | 'dark'
+  onToggleTheme: () => void
+  diagrams: DiagramListItem[]
+  activeDiagramId: string
+  onSelectDiagram: (id: string) => void
+  onCreateDiagram: () => void
+  onRenameDiagram: (id: string, name: string) => void
+  onDeleteDiagram: (id: string) => void
+}
+
+export default function Sidebar({
+  theme,
+  onToggleTheme,
+  diagrams,
+  activeDiagramId,
+  onSelectDiagram,
+  onCreateDiagram,
+  onRenameDiagram,
+  onDeleteDiagram,
+}: SidebarProps) {
   const nodesContext = useContext(NodesContext)
   const [schema, setSchema] = useState<string>('')
   const [open, setOpen] = useState(false)
+  const [editingDiagramId, setEditingDiagramId] = useState<string | null>(null)
+  const [diagramNameDraft, setDiagramNameDraft] = useState('')
+
+  const startRenamingDiagram = (diagram: DiagramListItem) => {
+    setEditingDiagramId(diagram.id)
+    setDiagramNameDraft(diagram.name)
+  }
+
+  const finishRenamingDiagram = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const name = diagramNameDraft.trim()
+    if (!editingDiagramId || !name) return
+
+    onRenameDiagram(editingDiagramId, name)
+    setEditingDiagramId(null)
+  }
 
   const handleBuildPrisma = () => {
     if (nodesContext && nodesContext.nodes && nodesContext.edges) {
@@ -72,6 +110,79 @@ export default function Sidebar({ theme, onToggleTheme }: { theme: 'light' | 'da
         <img src={buildIcon} alt="Build Prisma" style={{ width: '16px', height: '16px' }} />
         <span className="dnd-table-header">Prisma</span>
       </button>
+
+      <div className="sidebar-diagrams">
+        <div className="sidebar-diagrams-header">
+          <strong>Diagrams</strong>
+          <button className="add-diagram-button" type="button" onClick={onCreateDiagram}>
+            <span aria-hidden="true">+</span>
+            Add new
+          </button>
+        </div>
+        <nav className="diagram-list" aria-label="Saved ERD diagrams">
+          {diagrams.map((diagram) => (
+            <div
+              key={diagram.id}
+              className={`diagram-list-entry${diagram.id === activeDiagramId ? ' active' : ''}`}
+            >
+              {editingDiagramId === diagram.id ? (
+                <form className="diagram-rename-form" onSubmit={finishRenamingDiagram}>
+                  <input
+                    autoFocus
+                    aria-label="Diagram name"
+                    value={diagramNameDraft}
+                    onChange={(event) => setDiagramNameDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') setEditingDiagramId(null)
+                    }}
+                  />
+                  <button type="submit" disabled={!diagramNameDraft.trim()} aria-label="Save diagram name">
+                    Save
+                  </button>
+                  <button type="button" onClick={() => setEditingDiagramId(null)} aria-label="Cancel renaming">
+                    Cancel
+                  </button>
+                </form>
+              ) : (
+                <>
+                  <button
+                    className="diagram-list-item"
+                    type="button"
+                    aria-current={diagram.id === activeDiagramId ? 'page' : undefined}
+                    onClick={() => onSelectDiagram(diagram.id)}
+                    title={diagram.name}
+                  >
+                    {diagram.name}
+                  </button>
+                  <div className="diagram-list-actions">
+                    <button
+                      className="diagram-action-button"
+                      type="button"
+                      aria-label={`Rename ${diagram.name}`}
+                      title={`Rename ${diagram.name}`}
+                      onClick={() => startRenamingDiagram(diagram)}
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 24 24">
+                        <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+                      </svg>
+                    </button>
+                    <button
+                      className="diagram-action-button diagram-delete-button"
+                      type="button"
+                      aria-label={`Delete ${diagram.name}`}
+                      title={`Delete ${diagram.name}`}
+                      onClick={() => onDeleteDiagram(diagram.id)}
+                    >
+                      <img src={trashIcon} alt="" />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </nav>
+      </div>
+
       <button
         className="theme-toggle"
         type="button"

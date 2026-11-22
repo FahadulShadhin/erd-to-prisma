@@ -3,7 +3,7 @@ import { ReactFlow, Background, Controls, useNodesState, useEdgesState, ReactFlo
 import type { Node, Edge, Connection } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import TableNode, { type TableNodeData } from './components/TableNode'
-import type { Field } from './types'
+import type { DiagramListItem, Field } from './types'
 import RelationEdge, { type RelationType } from './components/RelationEdge'
 import Sidebar from './components/Sidebar'
 import EnumModal from './components/EnumModal'
@@ -12,6 +12,87 @@ import { NodesContext } from './context/NodesContext'
 
 type Theme = 'light' | 'dark'
 const THEME_STORAGE_KEY = 'erd-to-prisma:theme'
+const DIAGRAMS_STORAGE_KEY = 'erd-to-prisma:diagrams'
+const LEGACY_FLOW_STORAGE_KEY = 'erd-to-prisma:flow'
+type EnumDefinition = { name: string; values: string[] }
+type DiagramData = {
+  id: string
+  name: string
+  updatedAt: string
+  nodes: Node[]
+  edges: Edge[]
+  enums: EnumDefinition[]
+}
+type StoredDiagrams = { diagrams: DiagramData[]; activeDiagramId: string }
+
+function createDiagram(name: string): DiagramData {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    updatedAt: new Date().toISOString(),
+    nodes: [],
+    edges: [],
+    enums: [],
+  }
+}
+
+function getNodeIdSeed(nodes: Node[]): number {
+  return nodes.reduce((highestId, node) => {
+    const nodeId = Number(node.id)
+    return Number.isSafeInteger(nodeId) ? Math.max(highestId, nodeId) : highestId
+  }, 3)
+}
+
+function saveDiagrams(diagrams: DiagramData[], activeDiagramId: string): void {
+  try {
+    localStorage.setItem(DIAGRAMS_STORAGE_KEY, JSON.stringify({ diagrams, activeDiagramId }))
+  } catch (error) {
+    console.error('Unable to save ERD diagrams to browser storage.', error)
+  }
+}
+
+function isDiagramData(value: unknown): value is DiagramData {
+  if (!value || typeof value !== 'object') return false
+
+  const diagram = value as Record<string, unknown>
+  return typeof diagram.id === 'string'
+    && typeof diagram.name === 'string'
+    && typeof diagram.updatedAt === 'string'
+    && Array.isArray(diagram.nodes)
+    && Array.isArray(diagram.edges)
+    && Array.isArray(diagram.enums)
+}
+
+function readStoredDiagrams(): StoredDiagrams {
+  try {
+    const rawDiagrams = localStorage.getItem(DIAGRAMS_STORAGE_KEY)
+    if (rawDiagrams) {
+      const saved = JSON.parse(rawDiagrams) as Partial<StoredDiagrams>
+      if (Array.isArray(saved.diagrams) && saved.diagrams.every(isDiagramData) && saved.diagrams.length > 0) {
+        const activeDiagramId = saved.diagrams.some((diagram) => diagram.id === saved.activeDiagramId)
+          ? saved.activeDiagramId!
+          : saved.diagrams[0].id
+        return { diagrams: saved.diagrams, activeDiagramId }
+      }
+      console.error('Unable to load saved ERD diagrams: the saved data is invalid.')
+    }
+
+    const legacyFlow = localStorage.getItem(LEGACY_FLOW_STORAGE_KEY)
+    if (legacyFlow) {
+      const flow = JSON.parse(legacyFlow) as Partial<Pick<DiagramData, 'nodes' | 'edges' | 'enums'>>
+      if (Array.isArray(flow.nodes) && Array.isArray(flow.edges) && Array.isArray(flow.enums)) {
+        const diagram = { ...createDiagram('Diagram 1'), ...flow }
+        return { diagrams: [diagram], activeDiagramId: diagram.id }
+      }
+      console.error('Unable to migrate the previous ERD diagram: the saved data is invalid.')
+    }
+  } catch (error) {
+    console.error('Unable to read saved ERD diagrams from browser storage.', error)
+  }
+
+  const diagram = createDiagram('Diagram 1')
+  return { diagrams: [diagram], activeDiagramId: diagram.id }
+}
 
 export { NodesContext }
 
@@ -54,28 +135,114 @@ export default function App() {
 }
 
 function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
-  const persisted = useMemo(() => {
-    try {
-      const raw = localStorage.getItem('erd-to-prisma:flow')
-      return raw ? JSON.parse(raw) : { nodes: [], edges: [], enums: [] }
-    } catch (e) {
-      return { nodes: [], edges: [], enums: [] }
-    }
-  }, [])
+  const [initialDiagrams] = useState(readStoredDiagrams)
+  const [diagramList, setDiagramList] = useState<DiagramListItem[]>(
+    initialDiagrams.diagrams.map(({ id, name }) => ({ id, name }))
+  )
+  const [activeDiagramId, setActiveDiagramId] = useState(initialDiagrams.activeDiagramId)
+  const initialDiagram = initialDiagrams.diagrams.find((diagram) => diagram.id === initialDiagrams.activeDiagramId)!
+  const diagramsRef = useRef(initialDiagrams.diagrams)
 
-  const initialNodes: Node[] = persisted.nodes || []
-  const initialEdges: Edge[] = persisted.edges || []
-  const initialEnums = persisted.enums || []
-
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
-  const [enums, setEnums] = useState<Array<{ name: string; values: string[] }>>(initialEnums)
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialDiagram.nodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialDiagram.edges)
+  const [enums, setEnums] = useState<EnumDefinition[]>(initialDiagram.enums)
   const [enumEditor, setEnumEditor] = useState<{ open: boolean; nodeId?: string; fieldIndex?: number; prevType?: string }>(
     { open: false }
   )
   const [openDropdown, setOpenDropdown] = useState<{ nodeId: string; fieldIndex: number } | undefined>(undefined)
   const { screenToFlowPosition } = useReactFlow()
-  const idRef = useRef(3)
+  const idRef = useRef(getNodeIdSeed(initialDiagram.nodes))
+  const skipNextDiagramSave = useRef(true)
+
+  useEffect(() => {
+    let diagrams = diagramsRef.current
+    if (skipNextDiagramSave.current) {
+      skipNextDiagramSave.current = false
+    } else {
+      diagrams = diagrams.map((diagram) => (
+        diagram.id === activeDiagramId
+          ? { ...diagram, nodes, edges, enums, updatedAt: new Date().toISOString() }
+          : diagram
+      ))
+      diagramsRef.current = diagrams
+    }
+
+    saveDiagrams(diagrams, activeDiagramId)
+  }, [activeDiagramId, nodes, edges, enums])
+
+  const handleSelectDiagram = (id: string) => {
+    const diagram = diagramsRef.current.find((item) => item.id === id)
+    if (!diagram || diagram.id === activeDiagramId) return
+
+    skipNextDiagramSave.current = true
+    idRef.current = getNodeIdSeed(diagram.nodes)
+    setActiveDiagramId(diagram.id)
+    setNodes(diagram.nodes)
+    setEdges(diagram.edges)
+    setEnums(diagram.enums)
+  }
+
+  const handleCreateDiagram = () => {
+    const diagram = createDiagram(`Diagram ${diagramsRef.current.length + 1}`)
+    diagramsRef.current = [...diagramsRef.current, diagram]
+    setDiagramList((currentDiagrams) => [...currentDiagrams, { id: diagram.id, name: diagram.name }])
+    idRef.current = getNodeIdSeed(diagram.nodes)
+    setActiveDiagramId(diagram.id)
+    setNodes(diagram.nodes)
+    setEdges(diagram.edges)
+    setEnums(diagram.enums)
+    skipNextDiagramSave.current = false
+  }
+
+  const handleRenameDiagram = (id: string, name: string) => {
+    const normalizedName = name.trim()
+    if (!normalizedName) return
+
+    const diagrams = diagramsRef.current.map((diagram) => (
+      diagram.id === id
+        ? { ...diagram, name: normalizedName, updatedAt: new Date().toISOString() }
+        : diagram
+    ))
+    if (diagrams.every((diagram, index) => diagram === diagramsRef.current[index])) return
+
+    diagramsRef.current = diagrams
+    setDiagramList((currentDiagrams) => currentDiagrams.map((diagram) => (
+      diagram.id === id ? { ...diagram, name: normalizedName } : diagram
+    )))
+    saveDiagrams(diagrams, activeDiagramId)
+  }
+
+  const handleDeleteDiagram = (id: string) => {
+    const diagram = diagramsRef.current.find((item) => item.id === id)
+    if (!diagram || !window.confirm(`Delete "${diagram.name}"? This cannot be undone.`)) return
+
+    let diagrams = diagramsRef.current.filter((item) => item.id !== id)
+    let nextActiveDiagramId = activeDiagramId
+    if (id === activeDiagramId) {
+      if (diagrams.length === 0) {
+        const replacement = createDiagram('Diagram 1')
+        diagrams = [replacement]
+        nextActiveDiagramId = replacement.id
+      } else {
+        nextActiveDiagramId = diagrams[0].id
+      }
+    }
+
+    diagramsRef.current = diagrams
+    setDiagramList(diagrams.map(({ id: diagramId, name }) => ({ id: diagramId, name })))
+
+    if (id === activeDiagramId) {
+      const nextDiagram = diagrams.find((item) => item.id === nextActiveDiagramId)!
+      skipNextDiagramSave.current = true
+      idRef.current = getNodeIdSeed(nextDiagram.nodes)
+      setActiveDiagramId(nextActiveDiagramId)
+      setNodes(nextDiagram.nodes)
+      setEdges(nextDiagram.edges)
+      setEnums(nextDiagram.enums)
+    }
+
+    saveDiagrams(diagrams, nextActiveDiagramId)
+  }
   
   const onReconnect = useCallback(
     (oldEdge: Edge, newConnection: Connection) => {
@@ -249,14 +416,6 @@ function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleThe
     }))
   }, [nodes, setNodes, setEdges])
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('erd-to-prisma:flow', JSON.stringify({ nodes, edges, enums }))
-    } catch (e) {
-      // ignore storage errors (e.g., quota exceeded)
-    }
-  }, [nodes, edges, enums])
-
   // Render EnumModal globally so it is not constrained by React Flow node layering
 
   const nodeTypes = useMemo(() => ({ tableNode: TableNode }), [])
@@ -296,6 +455,12 @@ function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleThe
       <AppContent 
         theme={theme}
         onToggleTheme={onToggleTheme}
+        diagrams={diagramList}
+        activeDiagramId={activeDiagramId}
+        onSelectDiagram={handleSelectDiagram}
+        onCreateDiagram={handleCreateDiagram}
+        onRenameDiagram={handleRenameDiagram}
+        onDeleteDiagram={handleDeleteDiagram}
         nodes={nodesWithCallbacks}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -342,6 +507,12 @@ function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleThe
 function AppContent({ 
   theme,
   onToggleTheme,
+  diagrams,
+  activeDiagramId,
+  onSelectDiagram,
+  onCreateDiagram,
+  onRenameDiagram,
+  onDeleteDiagram,
   nodes, 
   edges, 
   onNodesChange, 
@@ -355,7 +526,16 @@ function AppContent({
 }: any) {
   return (
     <>
-      <Sidebar theme={theme} onToggleTheme={onToggleTheme} />
+      <Sidebar
+        theme={theme}
+        onToggleTheme={onToggleTheme}
+        diagrams={diagrams}
+        activeDiagramId={activeDiagramId}
+        onSelectDiagram={onSelectDiagram}
+        onCreateDiagram={onCreateDiagram}
+        onRenameDiagram={onRenameDiagram}
+        onDeleteDiagram={onDeleteDiagram}
+      />
       <div className="canvas">
         {nodes.length === 0 && (
           <div className="canvas-empty-state">
