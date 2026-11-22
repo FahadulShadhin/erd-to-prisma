@@ -60,6 +60,7 @@ export default function Sidebar({
   const [open, setOpen] = useState(false)
   const [editingDiagramId, setEditingDiagramId] = useState<string | null>(null)
   const [diagramNameDraft, setDiagramNameDraft] = useState('')
+  const [diagramPendingDelete, setDiagramPendingDelete] = useState<DiagramListItem | null>(null)
 
   const startRenamingDiagram = (diagram: DiagramListItem) => {
     setEditingDiagramId(diagram.id)
@@ -171,7 +172,7 @@ export default function Sidebar({
                       type="button"
                       aria-label={`Delete ${diagram.name}`}
                       title={`Delete ${diagram.name}`}
-                      onClick={() => onDeleteDiagram(diagram.id)}
+                      onClick={() => setDiagramPendingDelete(diagram)}
                     >
                       <img src={trashIcon} alt="" />
                     </button>
@@ -201,6 +202,45 @@ export default function Sidebar({
       </button>
       {/* Enums list removed from sidebar per request */}
       <PrismaModal open={open} schema={schema} onClose={() => setOpen(false)} />
+      {diagramPendingDelete && (
+        <div
+          className="delete-diagram-overlay"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="delete-diagram-title"
+          aria-describedby="delete-diagram-message"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setDiagramPendingDelete(null)
+          }}
+        >
+          <div className="delete-diagram-modal">
+            <h2 id="delete-diagram-title">Delete diagram?</h2>
+            <p id="delete-diagram-message">
+              Are you sure you want to delete <strong>{diagramPendingDelete.name}</strong>? The action cannot be undone.
+            </p>
+            <div className="delete-diagram-actions">
+              <button
+                type="button"
+                className="btn secondary"
+                autoFocus
+                onClick={() => setDiagramPendingDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn delete-diagram-confirm"
+                onClick={() => {
+                  onDeleteDiagram(diagramPendingDelete.id)
+                  setDiagramPendingDelete(null)
+                }}
+              >
+                Delete diagram
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

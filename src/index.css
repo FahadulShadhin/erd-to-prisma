@@ -13,6 +13,8 @@
   --color-border: #e6e8ef;
   --color-relation-edge: #8992a3;
   --color-accent: #007bff;
+  --color-danger: #c62828;
+  --color-danger-hover: #a91f1f;
   --color-modal-bg: #fff;
   --color-modal-body: #fafafa;
   --filter: none;
@@ -36,6 +38,8 @@
   --color-border: #353945;
   --color-relation-edge: #353945;
   --color-accent: #4f8cff;
+  --color-danger: #d84545;
+  --color-danger-hover: #c62828;
   --color-modal-bg: #23262f;
   --color-modal-body: #181a20;
   --filter: brightness(0) invert(1);
@@ -54,6 +58,8 @@
     --color-border: #353945;
     --color-relation-edge: #353945;
     --color-accent: #4f8cff;
+    --color-danger: #d84545;
+    --color-danger-hover: #c62828;
     --color-modal-bg: #23262f;
     --color-modal-body: #181a20;
     --filter: brightness(0) invert(1);

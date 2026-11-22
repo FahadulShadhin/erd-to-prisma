@@ -214,7 +214,7 @@ function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleThe
 
   const handleDeleteDiagram = (id: string) => {
     const diagram = diagramsRef.current.find((item) => item.id === id)
-    if (!diagram || !window.confirm(`Delete "${diagram.name}"? This cannot be undone.`)) return
+    if (!diagram) return
 
     let diagrams = diagramsRef.current.filter((item) => item.id !== id)
     let nextActiveDiagramId = activeDiagramId
