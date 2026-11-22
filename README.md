@@ -60,6 +60,12 @@ pnpm preview   # Preview the production build locally
 pnpm lint      # Run ESLint
 ```
 
+## Development documentation
+
+- [Agent workflow guide](AGENTS.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Development and smoke-test guide](docs/DEVELOPMENT.md)
+
 ## Credits
 
 Vectors and icons by [SVG Repo](https://www.svgrepo.com).
