@@ -35,6 +35,39 @@ Create an entity relationship diagram in your browser and generate a Prisma
 4. Open the local URL printed by Vite in your browser (usually
    [http://localhost:5173](http://localhost:5173)).
 
+## Run the API locally
+
+The Express API is a separate Node.js process in `server/`; PostgreSQL must be
+available using the server's `DATABASE_URL`.
+
+1. Configure these server-side environment variables in `server/.env`:
+   `DATABASE_URL`, `SESSION_SECRET` (at least 32 characters),
+   `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `APP_ORIGIN`,
+   `API_ORIGIN`, and optionally `PORT` (defaults to `3001`) and `NODE_ENV`.
+   Keep real credentials out of Git.
+2. Register a GitHub OAuth app. Set its Homepage URL to the frontend URL and
+   use this local callback URL:
+
+   ```text
+   http://localhost:3001/auth/github/callback
+   ```
+
+3. Apply the database migration and start the API:
+
+   ```bash
+   pnpm db:migrate
+   pnpm dev:server
+   ```
+
+4. In a separate terminal, run `pnpm dev` for the frontend. The Vite
+   development server proxies `/api` and `/auth` to the local API.
+
+For production, deploy the API as a separate Node.js service and set
+`VITE_API_BASE_URL` in Netlify to its public origin. Configure the GitHub OAuth
+callback as `<API_ORIGIN>/auth/github/callback` and `APP_ORIGIN` as the frontend
+origin. Prefer app/API custom domains on the same site so browser session
+cookies work reliably.
+
 ## Run with Docker Compose
 
 Docker Compose builds the frontend and serves it with Nginx. From the project
@@ -58,6 +91,8 @@ pnpm dev       # Start the development server
 pnpm build     # Type-check and create a production build in dist/
 pnpm preview   # Preview the production build locally
 pnpm lint      # Run ESLint
+pnpm build:server # Build the Express API
+pnpm db:migrate   # Apply PostgreSQL migrations
 ```
 
 ## Development documentation

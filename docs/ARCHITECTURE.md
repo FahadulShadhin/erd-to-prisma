@@ -2,7 +2,7 @@
 
 ## Overview
 
-ERD to Prisma is a browser-only Vite SPA. React Flow provides the visual canvas; React state and `NodesContext` carry diagram mutations; `localStorage` persists diagrams; utility modules transform diagram data into Prisma schemas or downloadable Express project templates.
+ERD to Prisma is a Vite SPA with a separate Express API. React Flow provides the visual canvas; React state and `NodesContext` carry diagram mutations; `localStorage` currently persists diagrams. The API handles GitHub authentication and stores user/provider identity records in PostgreSQL. Diagram cloud persistence will be added separately.
 
 ## Main runtime flow
 
@@ -10,6 +10,9 @@ ERD to Prisma is a browser-only Vite SPA. React Flow provides the visual canvas;
 App
   -> React Flow provider/canvas
   -> Sidebar
+       -> AuthControl
+            -> Express GitHub OAuth/session API
+                 -> PostgreSQL users and OAuth identities
        -> generatePrismaSchema(nodes, edges, enums)
        -> PrismaModal
             -> copy/download schema.prisma
@@ -32,6 +35,12 @@ The application is rendered from `src/main.tsx` and initialized in `src/App.tsx`
 It injects callback functions into node data and exposes shared data through `NodesContext`.
 
 `NodesContext` is a bridge for components such as `TableNode` and `TypeDropdown`. It is not a replacement for React Flow or the application state in `App.tsx`.
+
+`AuthControl` in `src/components/AuthControl.tsx` loads the current user from the
+Express API, starts GitHub sign-in, and signs out. The API stores only the
+application user ID in its PostgreSQL-backed session; provider tokens are not
+stored. Diagram entities remain local-only until the later cloud-persistence
+work.
 
 ## Diagram data
 
@@ -97,8 +106,13 @@ Keep class names and theme variables consistent across components. Both light an
 
 ## Build and deployment
 
-- Vite builds static assets to `dist/`.
+- Vite builds static assets to `dist/`, deployed independently (currently on Netlify).
+- `server/` is a Node.js 22+ TypeScript Express API deployed as a separate service.
+- PostgreSQL stores application users, OAuth identities, and server sessions. Apply versioned SQL migrations with `pnpm db:migrate`.
+- Configure `VITE_API_BASE_URL` on the frontend and server-only OAuth/database/session settings on the API. Do not expose server credentials in the Vite build.
+- Use same-site app/API domains for cookie-based sessions, or configure the deployment proxy and cookies deliberately.
 - `pnpm build` runs `tsc -b` and `vite build`.
+- `pnpm build:server` type-checks and builds the API.
 - `Dockerfile` uses Node 22 for build and Nginx for serving.
 - `compose.yaml` publishes the app on host port 8080.
 - `nginx.conf` serves the single-page application.

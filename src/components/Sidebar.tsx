@@ -10,6 +10,7 @@ import { NodesContext } from '../context/NodesContext'
 import { generatePrismaSchema } from '../utils/generatePrisma'
 import PrismaModal from './PrismaModal'
 import type { DiagramListItem } from '../types'
+import AuthControl from './AuthControl'
 
 function getInitialTableData(): TableNodeData {
   const fields: Field[] = [
@@ -102,6 +103,8 @@ export default function Sidebar({
 
   return (
     <div className="sidebar">
+      <AuthControl />
+
       <div className="dnd-item" draggable onDragStart={onDragStart}>
         <img src={dragIcon} alt="Add table" style={{ width: '16px', height: '16px' }} />
         <span className="dnd-table-header">Entity</span>
