@@ -61,7 +61,7 @@ router.post('/api/auth/logout', (request, response, next) => {
       response.clearCookie(sessionCookieName, {
         httpOnly: true,
         secure: config.NODE_ENV === 'production',
-        sameSite: 'lax',
+        sameSite: 'none',
         path: '/',
       })
       response.status(204).end()
