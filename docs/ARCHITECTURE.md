@@ -1,5 +1,7 @@
 # Architecture
 
+![Project architecture overview](./architecture-overview.png)
+
 ## Overview
 
 ERD to Prisma is a Vite SPA with a separate Express API. React Flow provides the visual canvas; React state and `NodesContext` carry diagram mutations. The API handles GitHub authentication and stores user/provider identity, sessions, and user-owned diagrams in PostgreSQL.
