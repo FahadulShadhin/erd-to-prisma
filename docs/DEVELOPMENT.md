@@ -24,13 +24,21 @@ pnpm build
 pnpm preview
 ```
 
-For container validation:
+Run the complete local stack in containers:
 
 ```bash
 docker compose up --build
 ```
 
-Open `http://localhost:8080`, then stop with `docker compose down`.
+This starts PostgreSQL, runs migrations, then starts the API and frontend.
+Open `http://localhost:8080`. GitHub login requires `GITHUB_CLIENT_ID` and
+`GITHUB_CLIENT_SECRET` from the shell or a root `.env` file, plus an OAuth
+callback URL of `http://localhost:8080/auth/github/callback`. Compose keeps
+both OAuth origins on port 8080; Nginx proxies requests to the API's internal
+port 3001.
+
+Stop with `docker compose down`; the database volume remains. Use
+`docker compose down -v` only when you intend to remove the local database.
 
 ## Manual feature smoke tests
 

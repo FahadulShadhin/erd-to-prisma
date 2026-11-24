@@ -1,6 +1,72 @@
+name: erd-to-prisma
+
+x-server-environment: &server-environment
+  NODE_ENV: development
+  PORT: "3001"
+  DATABASE_URL: postgres://erd_to_prisma:local-compose-password@db:5432/erd_to_prisma
+  SESSION_SECRET: "${SESSION_SECRET:-local-compose-session-secret-change-before-deploy}"
+  GITHUB_CLIENT_ID: "${GITHUB_CLIENT_ID:-local-compose-github-client-id}"
+  GITHUB_CLIENT_SECRET: "${GITHUB_CLIENT_SECRET:-local-compose-github-client-secret}"
+  APP_ORIGIN: http://localhost:8080
+  API_ORIGIN: http://localhost:8080
+
 services:
-  app:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: erd_to_prisma
+      POSTGRES_USER: erd_to_prisma
+      POSTGRES_PASSWORD: local-compose-password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    command: ["node", "server/dist/migrate.js"]
+    environment: *server-environment
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    environment: *server-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/healthz').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  frontend:
     build: .
     ports:
       - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  postgres_data:

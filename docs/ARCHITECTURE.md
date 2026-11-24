@@ -130,8 +130,9 @@ Keep class names and theme variables consistent across components. Both light an
 - Use same-site app/API domains for cookie-based sessions, or configure the deployment proxy and cookies deliberately.
 - `pnpm build` runs `tsc -b` and `vite build`.
 - `pnpm build:server` type-checks and builds the API.
-- `Dockerfile` uses Node 22 for build and Nginx for serving.
-- `compose.yaml` publishes the app on host port 8080.
-- `nginx.conf` serves the single-page application.
+- `Dockerfile` builds the frontend and serves it with Nginx.
+- `server/Dockerfile` builds and runs the API on Node.js 22.
+- `compose.yaml` starts PostgreSQL, runs migrations, starts the API, and serves the frontend on host port 8080.
+- `nginx.conf` serves the single-page application and proxies `/api/` and `/auth/` to the API service.
 
 Generated output and dependencies should not be committed for routine source changes.

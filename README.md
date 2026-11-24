@@ -117,9 +117,27 @@ development Vite server proxies `/api` and `/auth` to the local API.
   `<API_ORIGIN>/auth/github/callback`. Use same-site app/API domains where
   possible, or configure cross-site cookies and origins deliberately.
 
-`docker compose up --build` builds and serves the static frontend through
-Nginx on [http://localhost:8080](http://localhost:8080). It does not start the
-API or PostgreSQL; those remain separate services.
+### Run the full stack with Docker Compose
+
+Docker Compose starts PostgreSQL, applies database migrations, starts the API,
+and serves the frontend through Nginx:
+
+```bash
+docker compose up --build
+```
+
+Open [http://localhost:8080](http://localhost:8080). The default local setup
+supports guest use; GitHub login needs real `GITHUB_CLIENT_ID` and
+`GITHUB_CLIENT_SECRET` values supplied in the shell or a root `.env` file.
+Register the OAuth callback as
+`http://localhost:8080/auth/github/callback`. Open the app at port `8080`;
+Compose configures both OAuth origins to that address while Nginx proxies
+requests to the API's internal port `3001`. Compose's placeholder OAuth
+values and session secret are for local development only.
+
+Stop the stack with `docker compose down`. The PostgreSQL volume is preserved;
+use `docker compose down -v` only when you intend to delete local database
+data.
 
 ## Useful commands
 
