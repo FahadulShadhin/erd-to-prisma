@@ -13,7 +13,8 @@
 Design a relational data model visually, then turn it into a Prisma schema or a
 downloadable Express + Prisma starter project.
 
-![ERD to Prisma editor](public/Screenshot%202026-04-07%20at%2012.36.19%E2%80%AFAM.png)
+![ERD to Prisma editor](public/Screenshot%202026-11-24%20at%2011.23.53 PM.png)
+![Prisma schema](public/Screenshot%202026-11-24%20at%2011.26.00 PM.png)
 
 ## Project overview
 
