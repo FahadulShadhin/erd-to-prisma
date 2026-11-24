@@ -2,7 +2,7 @@
 
 ## Overview
 
-ERD to Prisma is a Vite SPA with a separate Express API. React Flow provides the visual canvas; React state and `NodesContext` carry diagram mutations; `localStorage` currently persists diagrams. The API handles GitHub authentication and stores user/provider identity records in PostgreSQL. Diagram cloud persistence will be added separately.
+ERD to Prisma is a Vite SPA with a separate Express API. React Flow provides the visual canvas; React state and `NodesContext` carry diagram mutations. The API handles GitHub authentication and stores user/provider identity, sessions, and user-owned diagrams in PostgreSQL.
 
 ## Main runtime flow
 
@@ -12,7 +12,9 @@ App
   -> Sidebar
        -> AuthControl
             -> Express GitHub OAuth/session API
-                 -> PostgreSQL users and OAuth identities
+                 -> PostgreSQL users, OAuth identities, sessions, and diagrams
+       -> typed diagram API
+            -> owner-scoped PostgreSQL diagram queries
        -> generatePrismaSchema(nodes, edges, enums)
        -> PrismaModal
             -> copy/download schema.prisma
@@ -26,21 +28,21 @@ The application is rendered from `src/main.tsx` and initialized in `src/App.tsx`
 
 `FlowCanvasWrapper` in `src/App.tsx` owns:
 
-- The active diagram id and diagram list.
+- The active diagram id and the authenticated user's diagram list.
 - React Flow `nodes`, `edges`, and `onNodesChange`/`onEdgesChange`.
 - Diagram-wide enum definitions.
 - Field dropdown and enum editor UI state.
-- Browser persistence for diagrams and theme.
+- Per-user diagram cache and browser-local theme preference.
 
 It injects callback functions into node data and exposes shared data through `NodesContext`.
 
 `NodesContext` is a bridge for components such as `TableNode` and `TypeDropdown`. It is not a replacement for React Flow or the application state in `App.tsx`.
 
-`AuthControl` in `src/components/AuthControl.tsx` loads the current user from the
-Express API, starts GitHub sign-in, and signs out. The API stores only the
-application user ID in its PostgreSQL-backed session; provider tokens are not
-stored. Diagram entities remain local-only until the later cloud-persistence
-work.
+`App` resolves the session before rendering a workspace. Signed-in startup loads
+the user's diagrams from the API before mounting the canvas; signed-out users
+start with a fresh in-memory diagram. `AuthControl` starts GitHub sign-in and
+signs out. The API stores only the application user ID in its PostgreSQL-backed
+session; provider tokens are not stored.
 
 ## Diagram data
 
@@ -55,19 +57,32 @@ React Flow `Edge` data contains a `relationType` of `one-to-one`, `one-to-many`,
 
 ## Persistence
 
-The app stores theme and diagrams under:
+PostgreSQL is the source of truth for signed-in users. The authenticated diagram
+API derives ownership from the session, and all create, update, and delete
+queries are scoped by that owner. Updates and deletes use the diagram's separate
+integer version to reject stale writes. The diagram entity remains exactly
+`id`, `name`, `updatedAt`, `nodes`, `edges`, and `enums`.
 
-- `erd-to-prisma:theme`
-- `erd-to-prisma:diagrams`
+`src/services/diagram-api.ts` owns the typed HTTP boundary and stores a cache
+under `erd-to-prisma:diagrams:<user-id>`. A confirmed server load refreshes that
+cache. It is not used to initialize a workspace while the API is available;
+when the API is unavailable, the signed-in user's cache may be shown with an
+offline indicator. Guest edits are in-memory only.
 
-It also recognizes legacy data in `erd-to-prisma:flow` and migrates it into a `Diagram 1` entry.
+The former unscoped `erd-to-prisma:diagrams` format and legacy
+`erd-to-prisma:flow` format are read only as explicit import candidates after
+sign-in. They are never automatically uploaded or treated as the signed-in
+workspace. The theme remains browser-local under `erd-to-prisma:theme`.
 
 When changing persisted shapes:
 
 1. Update the relevant runtime types.
-2. Add compatible parsing/defaulting in `readStoredDiagrams`.
-3. Preserve legacy keys and migration behavior.
-4. Manually verify load, edit, switch, create, rename, and delete flows.
+2. Keep API validation compatible with React Flow properties, including
+   optional `measured`, `selected`, and `dragging`.
+3. Keep browser cache parsing user-scoped and preserve the explicit legacy
+   import path.
+4. Manually verify authenticated load, edit, switch, create, rename, delete,
+   import, sign-out, and account-switch flows.
 
 ## Schema generation
 

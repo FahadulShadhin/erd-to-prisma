@@ -7,23 +7,38 @@ import type { DiagramListItem, Field } from './types'
 import RelationEdge, { type RelationType } from './components/RelationEdge'
 import Sidebar from './components/Sidebar'
 import EnumModal from './components/EnumModal'
-import { useCallback, useMemo, useRef, useEffect, useState } from 'react'
+import { useCallback, useMemo, useRef, useEffect, useState, type ComponentProps } from 'react'
 import { NodesContext } from './context/NodesContext'
+import AuthControl from './components/AuthControl'
+import { fetchCurrentUser, type AuthUser } from './services/auth-api'
+import {
+  createCloudDiagram,
+  DiagramApiError,
+  deleteCloudDiagram,
+  fetchDiagrams,
+  hasSkippedLocalImport,
+  markLocalDiagramsImported,
+  markLocalImportSkipped,
+  readImportedLocalDiagramIds,
+  readDiagramCache,
+  readLocalImportCandidates,
+  saveDiagramCache,
+  updateCloudDiagram,
+  type DiagramData,
+  type VersionedDiagram,
+} from './services/diagram-api'
 
 type Theme = 'light' | 'dark'
 const THEME_STORAGE_KEY = 'erd-to-prisma:theme'
-const DIAGRAMS_STORAGE_KEY = 'erd-to-prisma:diagrams'
-const LEGACY_FLOW_STORAGE_KEY = 'erd-to-prisma:flow'
 type EnumDefinition = { name: string; values: string[] }
-type DiagramData = {
-  id: string
-  name: string
-  updatedAt: string
-  nodes: Node[]
-  edges: Edge[]
-  enums: EnumDefinition[]
-}
-type StoredDiagrams = { diagrams: DiagramData[]; activeDiagramId: string }
+type AuthState =
+  | { status: 'loading' }
+  | { status: 'signed-out' }
+  | { status: 'signed-in'; user: AuthUser }
+  | { status: 'error'; message: string }
+type SaveState =
+  | { status: 'saved' | 'saving' | 'offline' | 'guest' }
+  | { status: 'error'; message: string; retry?: () => void }
 
 function createDiagram(name: string): DiagramData {
   return {
@@ -43,65 +58,9 @@ function getNodeIdSeed(nodes: Node[]): number {
   }, 3)
 }
 
-function saveDiagrams(diagrams: DiagramData[], activeDiagramId: string): void {
-  try {
-    localStorage.setItem(DIAGRAMS_STORAGE_KEY, JSON.stringify({ diagrams, activeDiagramId }))
-  } catch (error) {
-    console.error('Unable to save ERD diagrams to browser storage.', error)
-  }
-}
-
-function isDiagramData(value: unknown): value is DiagramData {
-  if (!value || typeof value !== 'object') return false
-
-  const diagram = value as Record<string, unknown>
-  return typeof diagram.id === 'string'
-    && typeof diagram.name === 'string'
-    && typeof diagram.updatedAt === 'string'
-    && Array.isArray(diagram.nodes)
-    && Array.isArray(diagram.edges)
-    && Array.isArray(diagram.enums)
-}
-
-function readStoredDiagrams(): StoredDiagrams {
-  try {
-    const rawDiagrams = localStorage.getItem(DIAGRAMS_STORAGE_KEY)
-    if (rawDiagrams) {
-      const saved = JSON.parse(rawDiagrams) as Partial<StoredDiagrams>
-      if (Array.isArray(saved.diagrams) && saved.diagrams.every(isDiagramData) && saved.diagrams.length > 0) {
-        const activeDiagramId = saved.diagrams.some((diagram) => diagram.id === saved.activeDiagramId)
-          ? saved.activeDiagramId!
-          : saved.diagrams[0].id
-        return { diagrams: saved.diagrams, activeDiagramId }
-      }
-      console.error('Unable to load saved ERD diagrams: the saved data is invalid.')
-    }
-
-    const legacyFlow = localStorage.getItem(LEGACY_FLOW_STORAGE_KEY)
-    if (legacyFlow) {
-      const flow = JSON.parse(legacyFlow) as Partial<Pick<DiagramData, 'nodes' | 'edges' | 'enums'>>
-      if (Array.isArray(flow.nodes) && Array.isArray(flow.edges) && Array.isArray(flow.enums)) {
-        const diagram = { ...createDiagram('Diagram 1'), ...flow }
-        return { diagrams: [diagram], activeDiagramId: diagram.id }
-      }
-      console.error('Unable to migrate the previous ERD diagram: the saved data is invalid.')
-    }
-  } catch (error) {
-    console.error('Unable to read saved ERD diagrams from browser storage.', error)
-  }
-
-  const diagram = createDiagram('Diagram 1')
-  return { diagrams: [diagram], activeDiagramId: diagram.id }
-}
-
-export { NodesContext }
-
-export const useNodesData = () => {
-  // Hook is no longer needed, Sidebar will receive context as prop
-  throw new Error('useNodesData is deprecated, use nodesContext prop instead')
-}
-
 export default function App() {
+  const [authState, setAuthState] = useState<AuthState>({ status: 'loading' })
+  const [authRetryCount, setAuthRetryCount] = useState(0)
   const [theme, setTheme] = useState<Theme>(() => {
     try {
       const savedTheme = localStorage.getItem(THEME_STORAGE_KEY)
@@ -122,26 +81,231 @@ export default function App() {
     }
   }, [theme])
 
+  useEffect(() => {
+    let active = true
+    void fetchCurrentUser()
+      .then((user) => {
+        if (active) setAuthState(user ? { status: 'signed-in', user } : { status: 'signed-out' })
+      })
+      .catch(() => {
+        if (active) setAuthState({ status: 'error', message: 'Unable to reach the login service.' })
+      })
+    return () => {
+      active = false
+    }
+  }, [authRetryCount])
+
+  const onSignedOut = () => setAuthState({ status: 'signed-out' })
+  const onAuthRetry = () => {
+    setAuthState({ status: 'loading' })
+    setAuthRetryCount((count) => count + 1)
+  }
+  const authControl = (
+    <AuthControl
+      status={authState.status}
+      user={authState.status === 'signed-in' ? authState.user : null}
+      error={authState.status === 'error' ? authState.message : undefined}
+      onRetry={onAuthRetry}
+      onSignedOut={onSignedOut}
+    />
+  )
+
+  if (authState.status === 'loading' || authState.status === 'error') {
+    return (
+      <div className="app-container">
+        <aside className="sidebar">{authControl}</aside>
+        <main className="workspace-state">
+          {authState.status === 'loading' ? 'Checking your account…' : 'Account connection failed.'}
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="app-container">
       <ReactFlowProvider>
-        <FlowCanvasWrapper
-          theme={theme}
-          onToggleTheme={() => setTheme((currentTheme) => currentTheme === 'light' ? 'dark' : 'light')}
-        />
+        {authState.status === 'signed-in' ? (
+          <AuthenticatedWorkspace
+            key={authState.user.id}
+            user={authState.user}
+            theme={theme}
+            onToggleTheme={() => setTheme((currentTheme) => currentTheme === 'light' ? 'dark' : 'light')}
+            authControl={authControl}
+          />
+        ) : (
+          <FlowCanvasWrapper
+            theme={theme}
+            onToggleTheme={() => setTheme((currentTheme) => currentTheme === 'light' ? 'dark' : 'light')}
+            user={null}
+            authControl={authControl}
+          />
+        )}
       </ReactFlowProvider>
     </div>
   )
 }
 
-function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
-  const [initialDiagrams] = useState(readStoredDiagrams)
-  const [diagramList, setDiagramList] = useState<DiagramListItem[]>(
-    initialDiagrams.diagrams.map(({ id, name }) => ({ id, name }))
+type WorkspaceProps = {
+  theme: Theme
+  onToggleTheme: () => void
+  user: AuthUser | null
+  authControl: React.ReactNode
+}
+
+function AuthenticatedWorkspace({
+  user,
+  theme,
+  onToggleTheme,
+  authControl,
+}: WorkspaceProps & { user: AuthUser }) {
+  const [retryCount, setRetryCount] = useState(0)
+  const [loadedWorkspace, setLoadedWorkspace] = useState<{
+    diagrams: VersionedDiagram[]
+    activeDiagramId: string
+    offline: boolean
+  } | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [importCandidates, setImportCandidates] = useState<DiagramData[]>([])
+  const defaultDiagramRef = useRef<DiagramData>(createDiagram('Diagram 1'))
+
+  useEffect(() => {
+    let active = true
+    setLoadedWorkspace(null)
+    setLoadError(null)
+    void (async () => {
+      try {
+        let diagrams = await fetchDiagrams()
+        if (diagrams.length === 0) {
+          try {
+            diagrams = [await createCloudDiagram(defaultDiagramRef.current)]
+          } catch (error) {
+            if (!(error instanceof DiagramApiError) || error.status !== 409) throw error
+            diagrams = await fetchDiagrams()
+            if (diagrams.length === 0) throw error
+          }
+        }
+        if (!active) return
+
+        const cached = readDiagramCache(user.id)
+        const activeDiagramId = cached?.diagrams.some(({ diagram }) => (
+          diagram.id === cached.activeDiagramId && diagrams.some((item) => item.diagram.id === diagram.id)
+        )) ? cached.activeDiagramId : diagrams[0].diagram.id
+        saveDiagramCache(user.id, { diagrams, activeDiagramId })
+        if (!hasSkippedLocalImport(user.id)) {
+          const cloudIds = new Set(diagrams.map(({ diagram }) => diagram.id))
+          const importedIds = readImportedLocalDiagramIds(user.id)
+          setImportCandidates(readLocalImportCandidates().filter(({ id }) => (
+            !cloudIds.has(id) && !importedIds.has(id)
+          )))
+        }
+        setLoadedWorkspace({ diagrams, activeDiagramId, offline: false })
+      } catch (error) {
+        if (!active) return
+        const cached = readDiagramCache(user.id)
+        if (cached?.diagrams.length) {
+          setLoadedWorkspace({
+            diagrams: cached.diagrams,
+            activeDiagramId: cached.activeDiagramId,
+            offline: true,
+          })
+        } else {
+          setLoadError(error instanceof Error ? error.message : 'Unable to load your diagrams.')
+        }
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [retryCount, user.id])
+
+  if (!loadedWorkspace) {
+    return (
+      <>
+        <Sidebar
+          theme={theme}
+          onToggleTheme={onToggleTheme}
+          diagrams={[]}
+          activeDiagramId=""
+          onSelectDiagram={() => {}}
+          onCreateDiagram={() => {}}
+          onRenameDiagram={() => {}}
+          onDeleteDiagram={() => {}}
+          authControl={authControl}
+          saveState={loadError ? { status: 'error', message: loadError } : { status: 'saving' }}
+          onRetrySave={() => setRetryCount((count) => count + 1)}
+          importCandidates={[]}
+          onImportLocalDiagrams={async () => {}}
+          onSkipLocalImport={() => {}}
+        />
+        <main className="workspace-state" role={loadError ? 'alert' : 'status'}>
+          {loadError ? (
+            <>
+              <p>{loadError}</p>
+              <button type="button" onClick={() => setRetryCount((count) => count + 1)}>
+                Retry loading diagrams
+              </button>
+            </>
+          ) : 'Loading your saved diagrams…'}
+        </main>
+      </>
+    )
+  }
+
+  return (
+    <FlowCanvasWrapper
+      key={user.id}
+      theme={theme}
+      onToggleTheme={onToggleTheme}
+      user={user}
+      authControl={authControl}
+      initialRecords={loadedWorkspace.diagrams}
+      initialActiveDiagramId={loadedWorkspace.activeDiagramId}
+      initiallyOffline={loadedWorkspace.offline}
+      importCandidates={importCandidates}
+      onImportCandidatesChange={setImportCandidates}
+      onSkipLocalImport={() => {
+        markLocalImportSkipped(user.id)
+        setImportCandidates([])
+      }}
+    />
   )
-  const [activeDiagramId, setActiveDiagramId] = useState(initialDiagrams.activeDiagramId)
-  const initialDiagram = initialDiagrams.diagrams.find((diagram) => diagram.id === initialDiagrams.activeDiagramId)!
-  const diagramsRef = useRef(initialDiagrams.diagrams)
+}
+
+function FlowCanvasWrapper({
+  theme,
+  onToggleTheme,
+  user,
+  authControl,
+  initialRecords,
+  initialActiveDiagramId,
+  initiallyOffline = false,
+  importCandidates: initialImportCandidates = [],
+  onImportCandidatesChange,
+  onSkipLocalImport,
+}: WorkspaceProps & {
+  initialRecords?: VersionedDiagram[]
+  initialActiveDiagramId?: string
+  initiallyOffline?: boolean
+  importCandidates?: DiagramData[]
+  onImportCandidatesChange?: (diagrams: DiagramData[]) => void
+  onSkipLocalImport?: () => void
+}) {
+  const [initialDiagrams] = useState<DiagramData[]>(() => (
+    initialRecords?.map(({ diagram }) => diagram) ?? [createDiagram('Diagram 1')]
+  ))
+  const initialSelection = initialDiagrams.some(({ id }) => id === initialActiveDiagramId)
+    ? initialActiveDiagramId!
+    : initialDiagrams[0].id
+  const [diagramList, setDiagramList] = useState<DiagramListItem[]>(
+    initialDiagrams.map(({ id, name }) => ({ id, name }))
+  )
+  const [activeDiagramId, setActiveDiagramId] = useState(initialSelection)
+  const activeDiagramIdRef = useRef(initialSelection)
+  activeDiagramIdRef.current = activeDiagramId
+  const initialDiagram = initialDiagrams.find((diagram) => diagram.id === initialSelection)!
+  const diagramsRef = useRef(initialDiagrams)
+  const versionsRef = useRef(new Map(initialRecords?.map(({ diagram, version }) => [diagram.id, version]) ?? []))
+  const confirmedRecordsRef = useRef(new Map(initialRecords?.map((record) => [record.diagram.id, record]) ?? []))
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialDiagram.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialDiagram.edges)
@@ -153,12 +317,68 @@ function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleThe
   const { screenToFlowPosition } = useReactFlow()
   const idRef = useRef(getNodeIdSeed(initialDiagram.nodes))
   const skipNextDiagramSave = useRef(true)
+  const saveTimersRef = useRef(new Map<string, number>())
+  const writeQueuesRef = useRef(new Map<string, Promise<void>>())
+  const [saveState, setSaveState] = useState<SaveState>(
+    initiallyOffline ? { status: 'offline' } : user ? { status: 'saved' } : { status: 'guest' }
+  )
+  const [importCandidates, setImportCandidates] = useState(initialImportCandidates)
+
+  const cacheCurrentDiagrams = useCallback((activeId = activeDiagramIdRef.current) => {
+    if (!user) return
+    saveDiagramCache(user.id, {
+      diagrams: [...confirmedRecordsRef.current.values()],
+      activeDiagramId: activeId,
+    })
+  }, [user])
+
+  const syncDiagram = useCallback((id: string): Promise<void> => {
+    if (!user) {
+      setSaveState({ status: 'error', message: 'Sign in again before saving this diagram.' })
+      return Promise.resolve()
+    }
+    const previousWrite = writeQueuesRef.current.get(id) ?? Promise.resolve()
+    const nextWrite = previousWrite.catch(() => {}).then(async () => {
+      const diagram = diagramsRef.current.find((item) => item.id === id)
+      const version = versionsRef.current.get(id) ?? confirmedRecordsRef.current.get(id)?.version
+      if (!diagram) {
+        setSaveState({ status: 'error', message: 'Diagram is no longer available to save.' })
+        return
+      }
+      if (version === undefined) {
+        setSaveState({ status: 'error', message: 'Diagram version is unavailable. Reload to fetch the latest copy.' })
+        return
+      }
+
+      setSaveState({ status: 'saving' })
+      try {
+        const saved = await updateCloudDiagram(diagram, version)
+        versionsRef.current.set(id, saved.version)
+        confirmedRecordsRef.current.set(id, saved)
+        diagramsRef.current = diagramsRef.current.map((item) => (
+          item.id === id ? { ...item, updatedAt: saved.diagram.updatedAt } : item
+        ))
+        cacheCurrentDiagrams()
+        setSaveState({ status: 'saved' })
+      } catch (error) {
+        setSaveState({
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Unable to save diagram changes.',
+          retry: () => { void syncDiagram(id) },
+        })
+      }
+    })
+    writeQueuesRef.current.set(id, nextWrite)
+    return nextWrite
+  }, [cacheCurrentDiagrams, user])
 
   useEffect(() => {
+    let shouldSync = false
     let diagrams = diagramsRef.current
     if (skipNextDiagramSave.current) {
       skipNextDiagramSave.current = false
     } else {
+      shouldSync = true
       diagrams = diagrams.map((diagram) => (
         diagram.id === activeDiagramId
           ? { ...diagram, nodes, edges, enums, updatedAt: new Date().toISOString() }
@@ -167,8 +387,17 @@ function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleThe
       diagramsRef.current = diagrams
     }
 
-    saveDiagrams(diagrams, activeDiagramId)
-  }, [activeDiagramId, nodes, edges, enums])
+    if (user && shouldSync) {
+      const previousTimer = saveTimersRef.current.get(activeDiagramId)
+      if (previousTimer !== undefined) window.clearTimeout(previousTimer)
+      const timer = window.setTimeout(() => {
+        saveTimersRef.current.delete(activeDiagramId)
+        void syncDiagram(activeDiagramId)
+      }, 650)
+      saveTimersRef.current.set(activeDiagramId, timer)
+      setSaveState({ status: 'saving' })
+    }
+  }, [activeDiagramId, nodes, edges, enums, syncDiagram, user])
 
   const handleSelectDiagram = (id: string) => {
     const diagram = diagramsRef.current.find((item) => item.id === id)
@@ -180,18 +409,37 @@ function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleThe
     setNodes(diagram.nodes)
     setEdges(diagram.edges)
     setEnums(diagram.enums)
+    cacheCurrentDiagrams(diagram.id)
   }
 
-  const handleCreateDiagram = () => {
-    const diagram = createDiagram(`Diagram ${diagramsRef.current.length + 1}`)
+  const handleCreateDiagram = async () => {
+    let diagram = createDiagram(`Diagram ${diagramsRef.current.length + 1}`)
+    if (user) {
+      setSaveState({ status: 'saving' })
+      try {
+        const created = await createCloudDiagram(diagram)
+        diagram = created.diagram
+        versionsRef.current.set(diagram.id, created.version)
+        confirmedRecordsRef.current.set(diagram.id, created)
+        setSaveState({ status: 'saved' })
+      } catch (error) {
+        setSaveState({
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Unable to create diagram.',
+          retry: () => { void handleCreateDiagram() },
+        })
+        return
+      }
+    }
     diagramsRef.current = [...diagramsRef.current, diagram]
     setDiagramList((currentDiagrams) => [...currentDiagrams, { id: diagram.id, name: diagram.name }])
     idRef.current = getNodeIdSeed(diagram.nodes)
+    skipNextDiagramSave.current = true
     setActiveDiagramId(diagram.id)
     setNodes(diagram.nodes)
     setEdges(diagram.edges)
     setEnums(diagram.enums)
-    skipNextDiagramSave.current = false
+    cacheCurrentDiagrams(diagram.id)
   }
 
   const handleRenameDiagram = (id: string, name: string) => {
@@ -209,18 +457,79 @@ function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleThe
     setDiagramList((currentDiagrams) => currentDiagrams.map((diagram) => (
       diagram.id === id ? { ...diagram, name: normalizedName } : diagram
     )))
-    saveDiagrams(diagrams, activeDiagramId)
+    if (user) {
+      setSaveState({ status: 'saving' })
+      const previousTimer = saveTimersRef.current.get(id)
+      if (previousTimer !== undefined) {
+        window.clearTimeout(previousTimer)
+        saveTimersRef.current.delete(id)
+      }
+      void syncDiagram(id)
+    }
   }
 
-  const handleDeleteDiagram = (id: string) => {
+  const handleDeleteDiagram = async (id: string) => {
     const diagram = diagramsRef.current.find((item) => item.id === id)
     if (!diagram) return
+
+    if (user) {
+      const pendingTimer = saveTimersRef.current.get(id)
+      if (pendingTimer !== undefined) {
+        window.clearTimeout(pendingTimer)
+        saveTimersRef.current.delete(id)
+      }
+      await writeQueuesRef.current.get(id)
+      const version = versionsRef.current.get(id)
+      if (version === undefined) {
+        setSaveState({
+          status: 'error',
+          message: 'Diagram version is unavailable. Reload to fetch the latest copy.',
+          retry: () => window.location.reload(),
+        })
+        return
+      }
+      setSaveState({ status: 'saving' })
+      try {
+        await deleteCloudDiagram(id, version)
+        versionsRef.current.delete(id)
+        confirmedRecordsRef.current.delete(id)
+      } catch (error) {
+        setSaveState({
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Unable to delete diagram.',
+          retry: () => { void handleDeleteDiagram(id) },
+        })
+        return
+      }
+
+    }
 
     let diagrams = diagramsRef.current.filter((item) => item.id !== id)
     let nextActiveDiagramId = activeDiagramId
     if (id === activeDiagramId) {
       if (diagrams.length === 0) {
-        const replacement = createDiagram('Diagram 1')
+        let replacement = createDiagram('Diagram 1')
+        if (user) {
+          try {
+            const created = await createCloudDiagram(replacement)
+            replacement = created.diagram
+            versionsRef.current.set(replacement.id, created.version)
+            confirmedRecordsRef.current.set(replacement.id, created)
+          } catch (error) {
+            setSaveState({
+              status: 'error',
+              message: error instanceof Error ? error.message : 'Unable to create a replacement diagram.',
+              retry: () => { void handleCreateDiagram() },
+            })
+            diagramsRef.current = []
+            setDiagramList([])
+            setNodes([])
+            setEdges([])
+            setEnums([])
+            cacheCurrentDiagrams()
+            return
+          }
+        }
         diagrams = [replacement]
         nextActiveDiagramId = replacement.id
       } else {
@@ -241,7 +550,47 @@ function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleThe
       setEnums(nextDiagram.enums)
     }
 
-    saveDiagrams(diagrams, nextActiveDiagramId)
+    cacheCurrentDiagrams(nextActiveDiagramId)
+    if (user) setSaveState({ status: 'saved' })
+  }
+
+  const handleImportLocalDiagrams = async (selectedDiagrams: DiagramData[]) => {
+    if (!user) return
+    setSaveState({ status: 'saving' })
+    try {
+      for (const candidate of selectedDiagrams) {
+        const hasValidId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidate.id)
+        const idAlreadyUsed = diagramsRef.current.some(({ id }) => id === candidate.id)
+        let candidateToImport = { ...candidate, id: hasValidId && !idAlreadyUsed ? candidate.id : crypto.randomUUID() }
+        let imported: VersionedDiagram
+        try {
+          imported = await createCloudDiagram(candidateToImport)
+        } catch (error) {
+          if (!(error instanceof DiagramApiError) || error.status !== 409) throw error
+          candidateToImport = { ...candidateToImport, id: crypto.randomUUID() }
+          imported = await createCloudDiagram(candidateToImport)
+        }
+        versionsRef.current.set(imported.diagram.id, imported.version)
+        confirmedRecordsRef.current.set(imported.diagram.id, imported)
+        markLocalDiagramsImported(user.id, [candidate.id])
+        diagramsRef.current = [...diagramsRef.current, imported.diagram]
+        setDiagramList((current) => [...current, {
+          id: imported.diagram.id,
+          name: imported.diagram.name,
+        }])
+        setImportCandidates((current) => current.filter((diagram) => diagram !== candidate))
+        cacheCurrentDiagrams()
+      }
+      setSaveState({ status: 'saved' })
+      onImportCandidatesChange?.(importCandidates.filter((candidate) => !selectedDiagrams.includes(candidate)))
+    } catch (error) {
+      setSaveState({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Unable to import local diagrams.',
+        retry: () => { void handleImportLocalDiagrams(selectedDiagrams) },
+      })
+      throw error
+    }
   }
   
   const onReconnect = useCallback(
@@ -360,7 +709,7 @@ function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleThe
             })
           )
         },
-        updateField: (index: number, key: keyof Field, value: any) => {
+        updateField: (index: number, key: keyof Field, value: Field[keyof Field]) => {
           setNodes((nds) =>
             nds.map((n) => {
               if (n.id === node.id) {
@@ -419,7 +768,7 @@ function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleThe
   // Render EnumModal globally so it is not constrained by React Flow node layering
 
   const nodeTypes = useMemo(() => ({ tableNode: TableNode }), [])
-  const edgeTypes = useMemo(() => ({ relation: RelationEdge }), []) as any
+  const edgeTypes = useMemo(() => ({ relation: RelationEdge }), [])
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault()
@@ -443,7 +792,7 @@ function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleThe
           data: payload.data as unknown as Record<string, unknown>,
         }
         setNodes((nds) => nds.concat(newNode))
-      } catch (e) {
+      } catch {
         // ignore invalid payloads
       }
     },
@@ -455,12 +804,23 @@ function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleThe
       <AppContent 
         theme={theme}
         onToggleTheme={onToggleTheme}
+        authControl={authControl}
         diagrams={diagramList}
         activeDiagramId={activeDiagramId}
         onSelectDiagram={handleSelectDiagram}
         onCreateDiagram={handleCreateDiagram}
         onRenameDiagram={handleRenameDiagram}
         onDeleteDiagram={handleDeleteDiagram}
+        importCandidates={importCandidates}
+        onImportLocalDiagrams={handleImportLocalDiagrams}
+        onSkipLocalImport={() => {
+          onSkipLocalImport?.()
+          setImportCandidates([])
+        }}
+        saveState={saveState}
+        onRetrySave={() => {
+          if (user) void syncDiagram(activeDiagramId)
+        }}
         nodes={nodesWithCallbacks}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -504,15 +864,43 @@ function FlowCanvasWrapper({ theme, onToggleTheme }: { theme: Theme; onToggleThe
   )
 }
 
+type AppContentProps = {
+  theme: Theme
+  onToggleTheme: () => void
+  authControl: React.ReactNode
+  diagrams: DiagramListItem[]
+  activeDiagramId: string
+  onSelectDiagram: (id: string) => void
+  onCreateDiagram: () => void
+  onRenameDiagram: (id: string, name: string) => void
+  onDeleteDiagram: (id: string) => void
+  importCandidates: DiagramData[]
+  onImportLocalDiagrams: (diagrams: DiagramData[]) => Promise<void>
+  onSkipLocalImport: () => void
+  saveState: SaveState
+  onRetrySave: () => void
+  nodes: Node[]
+  edges: Edge[]
+} & Pick<ComponentProps<typeof ReactFlow>,
+  'onNodesChange' | 'onEdgesChange' | 'onConnect' | 'onReconnect'
+  | 'nodeTypes' | 'edgeTypes' | 'onDrop' | 'onDragOver'
+>
+
 function AppContent({ 
   theme,
   onToggleTheme,
+  authControl,
   diagrams,
   activeDiagramId,
   onSelectDiagram,
   onCreateDiagram,
   onRenameDiagram,
   onDeleteDiagram,
+  importCandidates,
+  onImportLocalDiagrams,
+  onSkipLocalImport,
+  saveState,
+  onRetrySave,
   nodes, 
   edges, 
   onNodesChange, 
@@ -522,19 +910,25 @@ function AppContent({
   nodeTypes, 
   edgeTypes, 
   onDrop, 
-  onDragOver 
-}: any) {
+  onDragOver
+}: AppContentProps) {
   return (
     <>
       <Sidebar
         theme={theme}
         onToggleTheme={onToggleTheme}
+        authControl={authControl}
         diagrams={diagrams}
         activeDiagramId={activeDiagramId}
         onSelectDiagram={onSelectDiagram}
         onCreateDiagram={onCreateDiagram}
         onRenameDiagram={onRenameDiagram}
         onDeleteDiagram={onDeleteDiagram}
+        importCandidates={importCandidates}
+        onImportLocalDiagrams={onImportLocalDiagrams}
+        onSkipLocalImport={onSkipLocalImport}
+        saveState={saveState}
+        onRetrySave={onRetrySave}
       />
       <div className="canvas">
         {nodes.length === 0 && (

@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
-import { fetchCurrentUser, getGitHubLoginUrl, logOut, type AuthUser } from '../services/auth-api'
+import { useEffect, useState } from 'react'
+import { getGitHubLoginUrl, logOut, type AuthUser } from '../services/auth-api'
 
-type AuthControlState =
-  | { status: 'loading' }
-  | { status: 'signed-out'; message?: string }
-  | { status: 'signed-in'; user: AuthUser }
-  | { status: 'error'; message: string }
+type AuthControlProps = {
+  status: 'loading' | 'signed-out' | 'signed-in' | 'error'
+  user: AuthUser | null
+  error?: string
+  onRetry: () => void
+  onSignedOut: () => void
+}
 
 function readGitHubLoginError(): boolean {
   const url = new URL(window.location.href)
@@ -19,46 +21,21 @@ function readGitHubLoginError(): boolean {
   return failed
 }
 
-export default function AuthControl() {
-  const [state, setState] = useState<AuthControlState>({ status: 'loading' })
-  const [retryCount, setRetryCount] = useState(0)
+export default function AuthControl({ status, user, error, onRetry, onSignedOut }: AuthControlProps) {
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState<string | null>(null)
-  const signInFailedRef = useRef<boolean | null>(null)
+  const [signInFailed, setSignInFailed] = useState(false)
 
   useEffect(() => {
-    let active = true
-    signInFailedRef.current ??= readGitHubLoginError()
-
-    void fetchCurrentUser()
-      .then((user) => {
-        if (!active) return
-        setState(
-          user
-            ? { status: 'signed-in', user }
-            : {
-                status: 'signed-out',
-                ...(signInFailedRef.current ? { message: 'GitHub sign-in failed. Please try again.' } : {}),
-              },
-        )
-      })
-      .catch(() => {
-        if (active) {
-          setState({ status: 'error', message: 'Unable to reach the login service.' })
-        }
-      })
-
-    return () => {
-      active = false
-    }
-  }, [retryCount])
+    setSignInFailed(readGitHubLoginError())
+  }, [])
 
   const handleSignOut = async () => {
     setIsSigningOut(true)
     setSignOutError(null)
     try {
       await logOut()
-      setState({ status: 'signed-out' })
+      onSignedOut()
     } catch (error) {
       setSignOutError(error instanceof Error ? error.message : 'Unable to sign out.')
     } finally {
@@ -68,23 +45,23 @@ export default function AuthControl() {
 
   return (
     <section className="account-panel" aria-label="Account">
-      {state.status === 'loading' ? (
+      {status === 'loading' ? (
         <p className="account-status" role="status">
           Checking account…
         </p>
-      ) : state.status === 'signed-in' ? (
+      ) : status === 'signed-in' && user ? (
         <>
           <div className="account-identity">
-            {state.user.avatarUrl ? (
-              <img className="account-avatar" src={state.user.avatarUrl} alt="" />
+            {user.avatarUrl ? (
+              <img className="account-avatar" src={user.avatarUrl} alt="" />
             ) : (
               <span className="account-avatar account-avatar-fallback" aria-hidden="true">
                 GH
               </span>
             )}
             <div className="account-user-details">
-              <strong>{state.user.displayName}</strong>
-              {state.user.username && <span>@{state.user.username}</span>}
+              <strong>{user.displayName}</strong>
+              {user.username && <span>@{user.username}</span>}
             </div>
           </div>
           {signOutError && (
@@ -105,11 +82,11 @@ export default function AuthControl() {
         <>
           <div className="account-heading">
             <strong>Save your diagrams</strong>
-            <span>{state.status === 'error' ? state.message : 'Sign in to your account'}</span>
+            <span>{status === 'error' ? error : 'Sign in to your account'}</span>
           </div>
-          {state.status === 'signed-out' && state.message && (
+          {status === 'signed-out' && signInFailed && (
             <p className="account-error" role="alert">
-              {state.message}
+            GitHub sign-in failed. Please try again.
             </p>
           )}
           <button
@@ -122,11 +99,11 @@ export default function AuthControl() {
             </svg>
             Continue with GitHub
           </button>
-          {state.status === 'error' && (
+          {status === 'error' && (
             <button
               className="account-retry-button"
               type="button"
-              onClick={() => setRetryCount((count) => count + 1)}
+              onClick={onRetry}
             >
               Retry connection
             </button>

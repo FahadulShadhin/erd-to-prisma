@@ -10,7 +10,12 @@ import { NodesContext } from '../context/NodesContext'
 import { generatePrismaSchema } from '../utils/generatePrisma'
 import PrismaModal from './PrismaModal'
 import type { DiagramListItem } from '../types'
-import AuthControl from './AuthControl'
+import type { DiagramData } from '../services/diagram-api'
+import type { ReactNode } from 'react'
+
+type SaveState =
+  | { status: 'saved' | 'saving' | 'offline' | 'guest' }
+  | { status: 'error'; message: string; retry?: () => void }
 
 function getInitialTableData(): TableNodeData {
   const fields: Field[] = [
@@ -44,6 +49,12 @@ type SidebarProps = {
   onCreateDiagram: () => void
   onRenameDiagram: (id: string, name: string) => void
   onDeleteDiagram: (id: string) => void
+  authControl: ReactNode
+  saveState: SaveState
+  onRetrySave: () => void
+  importCandidates: DiagramData[]
+  onImportLocalDiagrams: (diagrams: DiagramData[]) => Promise<void>
+  onSkipLocalImport: () => void
 }
 
 export default function Sidebar({
@@ -55,6 +66,12 @@ export default function Sidebar({
   onCreateDiagram,
   onRenameDiagram,
   onDeleteDiagram,
+  authControl,
+  saveState,
+  onRetrySave,
+  importCandidates,
+  onImportLocalDiagrams,
+  onSkipLocalImport,
 }: SidebarProps) {
   const nodesContext = useContext(NodesContext)
   const [schema, setSchema] = useState<string>('')
@@ -62,6 +79,10 @@ export default function Sidebar({
   const [editingDiagramId, setEditingDiagramId] = useState<string | null>(null)
   const [diagramNameDraft, setDiagramNameDraft] = useState('')
   const [diagramPendingDelete, setDiagramPendingDelete] = useState<DiagramListItem | null>(null)
+  const [selectedImportIndices, setSelectedImportIndices] = useState<Set<number>>(
+    () => new Set(importCandidates.map((_, index) => index))
+  )
+  const [importError, setImportError] = useState<string | null>(null)
 
   const startRenamingDiagram = (diagram: DiagramListItem) => {
     setEditingDiagramId(diagram.id)
@@ -89,6 +110,18 @@ export default function Sidebar({
     } else {
       console.log('No data available yet')
     }
+
+  }
+
+  const importSelectedDiagrams = async () => {
+    const selected = importCandidates.filter((_, index) => selectedImportIndices.has(index))
+    if (selected.length === 0) return
+    setImportError(null)
+    try {
+      await onImportLocalDiagrams(selected)
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Unable to import local diagrams.')
+    }
   }
 
   const onDragStart = (event: React.DragEvent<HTMLDivElement>) => {
@@ -103,7 +136,7 @@ export default function Sidebar({
 
   return (
     <div className="sidebar">
-      <AuthControl />
+      {authControl}
 
       <div className="dnd-item" draggable onDragStart={onDragStart}>
         <img src={dragIcon} alt="Add table" style={{ width: '16px', height: '16px' }} />
@@ -123,6 +156,17 @@ export default function Sidebar({
             Add new
           </button>
         </div>
+        <p className={`diagram-save-status${saveState.status === 'error' ? ' error' : ''}`} role="status">
+          {saveState.status === 'error' ? saveState.message
+            : saveState.status === 'guest' ? 'Sign in to save diagrams'
+            : saveState.status === 'saved' ? 'All changes saved'
+            : saveState.status === 'saving' ? 'Saving changes…'
+              : saveState.status === 'offline' ? 'Offline cache in use'
+                : 'Saving changes…'}
+          {saveState.status === 'error' && (
+            <button type="button" onClick={saveState.retry ?? onRetrySave}>Retry save</button>
+          )}
+        </p>
         <nav className="diagram-list" aria-label="Saved ERD diagrams">
           {diagrams.map((diagram) => (
             <div
@@ -134,6 +178,7 @@ export default function Sidebar({
                   <input
                     autoFocus
                     aria-label="Diagram name"
+                    maxLength={100}
                     value={diagramNameDraft}
                     onChange={(event) => setDiagramNameDraft(event.target.value)}
                     onKeyDown={(event) => {
@@ -185,6 +230,36 @@ export default function Sidebar({
             </div>
           ))}
         </nav>
+        {importCandidates.length > 0 && (
+          <section className="local-import-prompt" aria-label="Import local diagrams">
+            <strong>Local diagrams found</strong>
+            <p>Import selected diagrams as cloud copies?</p>
+            <div className="local-import-list">
+              {importCandidates.map((diagram, index) => (
+                <label key={`${diagram.id}-${index}`}>
+                  <input
+                    type="checkbox"
+                    checked={selectedImportIndices.has(index)}
+                    onChange={(event) => {
+                      setSelectedImportIndices((current) => {
+                        const next = new Set(current)
+                        if (event.target.checked) next.add(index)
+                        else next.delete(index)
+                        return next
+                      })
+                    }}
+                  />
+                  <span>{diagram.name}</span>
+                </label>
+              ))}
+            </div>
+            {importError && <p className="account-error" role="alert">{importError}</p>}
+            <button type="button" onClick={() => void importSelectedDiagrams()} disabled={selectedImportIndices.size === 0}>
+              Import selected
+            </button>
+            <button type="button" onClick={onSkipLocalImport}>Skip import</button>
+          </section>
+        )}
       </div>
 
       <button

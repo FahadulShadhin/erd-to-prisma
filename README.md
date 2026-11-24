@@ -62,6 +62,12 @@ available using the server's `DATABASE_URL`.
 4. In a separate terminal, run `pnpm dev` for the frontend. The Vite
    development server proxies `/api` and `/auth` to the local API.
 
+After GitHub sign-in, diagrams are loaded and saved through the authenticated
+API; PostgreSQL is authoritative. Signed-out edits are temporary in-memory
+workspaces. Existing browser diagrams are offered as explicit import copies
+after sign-in. Browser storage caches diagrams separately per account and is
+not used to overwrite cloud data.
+
 For production, deploy the API as a separate Node.js service and set
 `VITE_API_BASE_URL` in Netlify to its public origin. Configure the GitHub OAuth
 callback as `<API_ORIGIN>/auth/github/callback` and `APP_ORIGIN` as the frontend

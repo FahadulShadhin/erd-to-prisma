@@ -2,8 +2,10 @@ import { readFile } from 'node:fs/promises'
 import type { PoolClient } from 'pg'
 import { pool } from './db/pool.js'
 
-const migrationName = '001_github_auth'
-const migrationPath = new URL('../migrations/001_github_auth.sql', import.meta.url)
+const migrations = [
+  { name: '001_github_auth', path: new URL('../migrations/001_github_auth.sql', import.meta.url) },
+  { name: '002_diagrams', path: new URL('../migrations/002_diagrams.sql', import.meta.url) },
+]
 const migrationLockId = 638_421_907
 
 async function runMigration(): Promise<void> {
@@ -21,15 +23,17 @@ async function runMigration(): Promise<void> {
     transactionStarted = true
     await client.query('SELECT pg_advisory_xact_lock($1)', [migrationLockId])
 
-    const existing = await client.query<{ name: string }>(
-      'SELECT name FROM schema_migrations WHERE name = $1',
-      [migrationName],
-    )
+    for (const migration of migrations) {
+      const existing = await client.query<{ name: string }>(
+        'SELECT name FROM schema_migrations WHERE name = $1',
+        [migration.name],
+      )
 
-    if (existing.rows.length === 0) {
-      const migrationSql = await readFile(migrationPath, 'utf8')
-      await client.query(migrationSql)
-      await client.query('INSERT INTO schema_migrations (name) VALUES ($1)', [migrationName])
+      if (existing.rows.length === 0) {
+        const migrationSql = await readFile(migration.path, 'utf8')
+        await client.query(migrationSql)
+        await client.query('INSERT INTO schema_migrations (name) VALUES ($1)', [migration.name])
+      }
     }
 
     await client.query('COMMIT')
