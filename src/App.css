@@ -22,6 +22,27 @@ html, body, #root {
   gap: 12px;
 }
 
+.workspace-state {
+  display: grid;
+  flex: 1;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 24px;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.workspace-state button {
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
 .account-panel {
   display: flex;
   flex-direction: column;
@@ -125,6 +146,68 @@ html, body, #root {
   color: var(--color-danger);
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+
+.diagram-save-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.diagram-save-status.error {
+  color: var(--color-danger);
+}
+
+.diagram-save-status button,
+.local-import-prompt button {
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  padding: 4px 7px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.local-import-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.local-import-prompt p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.local-import-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 130px;
+  overflow: auto;
+}
+
+.local-import-list label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+}
+
+.local-import-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-diagrams-header {

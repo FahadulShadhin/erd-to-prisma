@@ -8,6 +8,7 @@ import { passport } from './auth/passport.js'
 import { config } from './config.js'
 import { pool } from './db/pool.js'
 import { authRouter } from './routes/auth-routes.js'
+import { diagramRouter } from './routes/diagram-routes.js'
 
 const sessionCookieName = 'erd_to_prisma.sid'
 const PostgreSqlSessionStore = connectPgSimple(session)
@@ -20,8 +21,8 @@ app.use(
   cors({
     origin: config.APP_ORIGIN,
     credentials: true,
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'If-Match'],
   }),
 )
 app.use(express.json({ limit: '1mb' }))
@@ -60,6 +61,7 @@ app.get('/healthz', apiRateLimit, async (_request, response) => {
 })
 
 app.use(authRouter)
+app.use(diagramRouter)
 
 app.use((_request, response) => {
   response.status(404).json({ error: 'Not found.' })

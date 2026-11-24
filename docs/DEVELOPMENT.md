@@ -34,9 +34,24 @@ Open `http://localhost:8080`, then stop with `docker compose down`.
 
 ## Manual feature smoke tests
 
+### Accounts and diagram persistence
+
+1. Sign in with GitHub and confirm the account's server diagrams load before
+   the canvas is shown.
+2. Create, edit, rename, and delete a diagram; reload and confirm the changes
+   are still present.
+3. Sign out and confirm the account's diagrams are no longer shown.
+4. Sign in as another account and confirm it only sees its own diagrams.
+5. If legacy browser diagrams exist, import selected diagrams and verify the
+   originals remain unchanged.
+6. Temporarily make the API unavailable and confirm a user-scoped cache is
+   clearly marked offline; without a cache, the app offers retry instead of
+   showing an empty account workspace.
+
 ### Canvas and entities
 
-1. Create a diagram and confirm it is selectable and persisted after reload.
+1. Create a diagram and confirm it is selectable; signed-in diagrams save to
+   the account, while signed-out diagrams remain temporary.
 2. Drag an Entity onto the canvas.
 3. Rename the entity and add/remove fields.
 4. Configure primary key, nullable, unique, and field type values.
@@ -61,9 +76,10 @@ Open `http://localhost:8080`, then stop with `docker compose down`.
 
 ### Persistence and themes
 
-1. Reload and confirm active diagram, nodes, edges, enums, and theme persist.
+1. Reload while signed in and confirm cloud diagrams and the local theme persist.
 2. Create, rename, switch, and delete diagrams.
-3. Verify the app preserves the legacy `erd-to-prisma:flow` migration path.
+3. Confirm local diagram data is offered for explicit import and never replaces
+   cloud data automatically.
 
 ## Before submitting
 
