@@ -53,7 +53,7 @@ export default function RelationEdge({
 
   // Determine text labels based on relation type
   const sourceLabel = relationType === 'one-to-one' ? '1' : relationType === 'one-to-many' ? '1' : 'N';
-  const targetLabel = relationType === 'one-to-one' ? '1' : 'N';
+  const targetLabel = relationType === 'one-to-one' ? '1' : relationType === 'one-to-many' ? 'N' : 'M';
 
   return (
     <>
@@ -99,7 +99,7 @@ export default function RelationEdge({
                 setIsExpanded(true);
               }}
             >
-              {relationType === 'one-to-one' ? '1:1' : relationType === 'one-to-many' ? '1:N' : 'N:N'}
+              {relationType === 'one-to-one' ? '1:1' : relationType === 'one-to-many' ? '1:N' : 'N:M'}
             </button>
           ) : (
             <div className="relation-selector-expanded">
@@ -131,7 +131,7 @@ export default function RelationEdge({
                   setIsExpanded(false);
                 }}
               >
-                N:N
+                N:M
               </button>
             </div>
           )}
