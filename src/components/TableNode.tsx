@@ -15,6 +15,7 @@ import TypeDropdown from './TypeDropdown'
 export interface TableNodeData {
   name: string;
   expanded: boolean;
+  junctionTable?: boolean;
   mode?: 'preview' | 'edit';
   fields: Field[];
   openEnumModal?: (index: number, prevType?: string) => void;

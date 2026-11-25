@@ -58,6 +58,65 @@ function getNodeIdSeed(nodes: Node[]): number {
   }, 3)
 }
 
+function singularizeTableName(name: string) {
+  if (name.endsWith('ies')) return `${name.slice(0, -3)}y`
+  if (name.endsWith('s') && !/(ss|us|is)$/i.test(name)) return name.slice(0, -1)
+  return name
+}
+
+function pluralizeTableName(name: string) {
+  if (name.endsWith('s')) return name
+  if (/[aeiou]y$/i.test(name)) return `${name}s`
+  if (name.endsWith('y')) return `${name.slice(0, -1)}ies`
+  return `${name}s`
+}
+
+function getJunctionTableName(sourceName: string, targetName: string, nodes: Node[]) {
+  const normalizedName = `${singularizeTableName(sourceName)}${pluralizeTableName(singularizeTableName(targetName))}`
+    .replace(/[^A-Za-z0-9_]/g, '')
+  const baseName = normalizedName || 'Junction'
+  const existingNames = new Set(nodes.map((node) => String(node.data?.name ?? '').toLowerCase()))
+  let name = baseName
+  let suffix = 2
+  while (existingNames.has(name.toLowerCase())) {
+    name = `${baseName}${suffix}`
+    suffix += 1
+  }
+  return name
+}
+
+function getForeignKeyFieldType(field?: Field) {
+  if (!field) return 'Int'
+  if (field.type === 'Int_autoinc') return 'Int'
+  if (field.type === 'String_cuid' || field.type === 'String_uuid') return 'String'
+  return field.type
+}
+
+function getJunctionEdgeHandles(firstNode: Node, secondNode: Node) {
+  const firstX = firstNode.position.x + (firstNode.measured?.width ?? firstNode.width ?? 0) / 2
+  const firstY = firstNode.position.y + (firstNode.measured?.height ?? firstNode.height ?? 0) / 2
+  const secondX = secondNode.position.x + (secondNode.measured?.width ?? secondNode.width ?? 0) / 2
+  const secondY = secondNode.position.y + (secondNode.measured?.height ?? secondNode.height ?? 0) / 2
+
+  if (Math.abs(secondX - firstX) >= Math.abs(secondY - firstY)) {
+    const firstIsLeft = firstX <= secondX
+    return {
+      firstSourceHandle: firstIsLeft ? 'right-center-source' : 'left-center-source',
+      firstTargetHandle: firstIsLeft ? 'left-center' : 'right-center',
+      secondSourceHandle: firstIsLeft ? 'left-center-source' : 'right-center-source',
+      secondTargetHandle: firstIsLeft ? 'right-center' : 'left-center',
+    }
+  }
+
+  const firstIsAbove = firstY <= secondY
+  return {
+    firstSourceHandle: firstIsAbove ? 'bottom-center-source' : 'top-center-source',
+    firstTargetHandle: firstIsAbove ? 'top-center' : 'bottom-center',
+    secondSourceHandle: firstIsAbove ? 'top-center-source' : 'bottom-center-source',
+    secondTargetHandle: firstIsAbove ? 'bottom-center' : 'top-center',
+  }
+}
+
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>({ status: 'loading' })
   const [authRetryCount, setAuthRetryCount] = useState(0)
@@ -314,6 +373,7 @@ function FlowCanvasWrapper({
     { open: false }
   )
   const [openDropdown, setOpenDropdown] = useState<{ nodeId: string; fieldIndex: number } | undefined>(undefined)
+  const [junctionConversionEdgeId, setJunctionConversionEdgeId] = useState<string | null>(null)
   const { screenToFlowPosition } = useReactFlow()
   const idRef = useRef(getNodeIdSeed(initialDiagram.nodes))
   const skipNextDiagramSave = useRef(true)
@@ -626,22 +686,117 @@ function FlowCanvasWrapper({
         type: 'relation',
         source: params.source!,
         target: params.target!,
-        data: { 
-          relationType: 'one-to-many' as RelationType,
-          onTypeChange: (type: RelationType) => {
-            setEdges((eds) =>
-              eds.map((edge) =>
-                edge.id === edgeId
-                  ? { ...edge, data: { ...edge.data, relationType: type } }
-                  : edge
-              )
-            )
-          },
-        },
+        data: { relationType: 'one-to-many' as RelationType },
       }
       setEdges((eds) => [...eds, newEdge])
     },
     [setEdges]
+  )
+
+  const convertToJunctionTable = () => {
+    if (!junctionConversionEdgeId) return
+
+    const originalEdge = edges.find((edge) => edge.id === junctionConversionEdgeId)
+    const sourceNode = originalEdge && nodes.find((node) => node.id === originalEdge.source)
+    const targetNode = originalEdge && nodes.find((node) => node.id === originalEdge.target)
+    if (!originalEdge || !sourceNode || !targetNode) {
+      setJunctionConversionEdgeId(null)
+      return
+    }
+
+    const sourceData = sourceNode.data as unknown as TableNodeData
+    const targetData = targetNode.data as unknown as TableNodeData
+    const sourceName = sourceData.name || sourceNode.id
+    const targetName = targetData.name || targetNode.id
+    const junctionName = getJunctionTableName(sourceName, targetName, nodes)
+    const junctionId = String(++idRef.current)
+    const junctionHandles = getJunctionEdgeHandles(sourceNode, targetNode)
+    const sourcePrimaryKey = sourceData.fields.find((field) => field.pk)
+    const targetPrimaryKey = targetData.fields.find((field) => field.pk)
+    const sourceForeignKey = `${sourceName}_id`
+    const targetForeignKey = `${targetName}_id`
+    const junctionFields: Field[] = [
+      { name: 'id', type: 'Int_autoinc', pk: true, fk: false, nullable: false, unique: true },
+      {
+        name: sourceForeignKey,
+        type: getForeignKeyFieldType(sourcePrimaryKey),
+        pk: false,
+        fk: true,
+        nullable: false,
+        unique: false,
+      },
+      {
+        name: targetForeignKey,
+        type: getForeignKeyFieldType(targetPrimaryKey),
+        pk: false,
+        fk: true,
+        nullable: false,
+        unique: false,
+      },
+    ]
+
+    const junctionNode: Node = {
+      id: junctionId,
+      type: 'tableNode',
+      position: {
+        x: (sourceNode.position.x + targetNode.position.x) / 2,
+        y: (sourceNode.position.y + targetNode.position.y) / 2,
+      },
+      data: {
+        name: junctionName,
+        expanded: true,
+        junctionTable: true,
+        fields: junctionFields,
+      },
+    }
+
+    setNodes((currentNodes) => [...currentNodes, junctionNode])
+    setEdges((currentEdges) => [
+      ...currentEdges.filter((edge) => edge.id !== originalEdge.id),
+      {
+        id: `${sourceNode.id}-${junctionId}`,
+        type: 'relation',
+        source: sourceNode.id,
+        target: junctionId,
+        sourceHandle: junctionHandles.firstSourceHandle,
+        targetHandle: junctionHandles.firstTargetHandle,
+        data: { relationType: 'one-to-many' as RelationType },
+      },
+      {
+        id: `${targetNode.id}-${junctionId}`,
+        type: 'relation',
+        source: targetNode.id,
+        target: junctionId,
+        sourceHandle: junctionHandles.secondSourceHandle,
+        targetHandle: junctionHandles.secondTargetHandle,
+        data: { relationType: 'one-to-many' as RelationType },
+      },
+    ])
+    setJunctionConversionEdgeId(null)
+  }
+
+  const edgesWithCallbacks = useMemo(
+    () => edges.map((edge) => ({
+      ...edge,
+      data: {
+        ...edge.data,
+        onTypeChange: (type: RelationType) => {
+          if (type === 'many-to-many') {
+            setJunctionConversionEdgeId(edge.id)
+            return
+          }
+
+          setEdges((currentEdges) =>
+            currentEdges.map((currentEdge) =>
+              currentEdge.id === edge.id
+                ? { ...currentEdge, data: { ...currentEdge.data, relationType: type } }
+                : currentEdge
+            )
+          )
+        },
+      },
+    })),
+    [edges, setEdges]
   )
 
   const addEnum = (e: { name: string; values: string[] }) => {
@@ -822,7 +977,7 @@ function FlowCanvasWrapper({
           if (user) void syncDiagram(activeDiagramId)
         }}
         nodes={nodesWithCallbacks}
-        edges={edges}
+        edges={edgesWithCallbacks}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -832,6 +987,39 @@ function FlowCanvasWrapper({
         onDrop={onDrop}
         onDragOver={onDragOver}
       />
+
+      {junctionConversionEdgeId && (
+        <div
+          className="junction-conversion-overlay"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="junction-conversion-title"
+          aria-describedby="junction-conversion-message"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setJunctionConversionEdgeId(null)
+          }}
+        >
+          <div className="junction-conversion-modal">
+            <h2 id="junction-conversion-title">Create a junction table?</h2>
+            <p id="junction-conversion-message">
+              This will replace the many-to-many relationship with a new junction table connected to both tables.
+            </p>
+            <div className="junction-conversion-actions">
+              <button
+                type="button"
+                className="btn secondary"
+                autoFocus
+                onClick={() => setJunctionConversionEdgeId(null)}
+              >
+                Cancel
+              </button>
+              <button type="button" className="btn primary" onClick={convertToJunctionTable}>
+                Create junction table
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <EnumModal
         open={!!enumEditor.open}
