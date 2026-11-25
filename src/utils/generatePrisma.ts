@@ -30,6 +30,13 @@ function capitalize(s: string) {
   return s[0].toUpperCase() + s.slice(1)
 }
 
+function pluralizeRelationName(name: string) {
+  if (name.endsWith('s')) return name
+  if (/[aeiou]y$/i.test(name)) return `${name}s`
+  if (name.endsWith('y')) return `${name.slice(0, -1)}ies`
+  return `${name}s`
+}
+
 export function generatePrismaSchema(
   nodes: Node[],
   edges: Edge[],
@@ -50,12 +57,12 @@ export function generatePrismaSchema(
   // Only include enums that are referenced somewhere to keep schema minimal
   const filteredEnums = (enums || []).filter((e) => referencedEnumNames.has(e.name))
   const enumsMap: Record<string, string[]> = Object.fromEntries(filteredEnums.map(e => [e.name, e.values]))
-  const models: Record<string, { fields: string[]; relationFields: string[] }> = {}
+  const models: Record<string, { fields: string[]; relationFields: string[]; constraints: string[] }> = {}
 
   // Initialize models and fields
   for (const n of nodes) {
     const modelName = capitalize(String(n.data?.name ?? n.id))
-    models[modelName] = { fields: [], relationFields: [] }
+    models[modelName] = { fields: [], relationFields: [], constraints: [] }
 
     const fields = (n.data?.fields ?? []) as Field[]
     for (const f of fields) {
@@ -119,7 +126,17 @@ export function generatePrismaSchema(
 
       models[modelName].fields.push(line)
     }
+
+    if (n.data?.junctionTable === true) {
+      const foreignKeyFields = fields.filter((field) => field.fk).map((field) => field.name)
+      if (foreignKeyFields.length === 2) {
+        models[modelName].constraints.push(`  @@unique([${foreignKeyFields.join(', ')}])`)
+      }
+    }
   }
+
+  const hasModelField = (modelName: string, fieldName: string) =>
+    models[modelName].fields.some((field) => field.trimStart().startsWith(`${fieldName} `))
 
   // Process edges to generate relations
   for (const e of edges) {
@@ -139,9 +156,11 @@ export function generatePrismaSchema(
       const srcPkType = toPrismaType(srcPk?.type ?? 'Int')
 
       const fkName = `${String((src.data as any)?.name)}_id`
-      models[tgtModel].fields.push(`  ${fkName} ${srcPkType}`)
+      if (!hasModelField(tgtModel, fkName)) {
+        models[tgtModel].fields.push(`  ${fkName} ${srcPkType}`)
+      }
       models[tgtModel].relationFields.push(`  ${String((src.data as any)?.name)} ${srcModel} @relation(fields: [${fkName}], references: [${srcPkName}])`)
-      models[srcModel].relationFields.push(`  ${String((tgt.data as any)?.name)}s ${tgtModel}[]`)
+      models[srcModel].relationFields.push(`  ${pluralizeRelationName(String((tgt.data as any)?.name))} ${tgtModel}[]`)
     } else if (relationType === 'one-to-one') {
       const srcFields = (src.data?.fields ?? []) as Field[]
       const srcPk = srcFields.find((f: Field) => f.pk)
@@ -179,8 +198,8 @@ ${e.values.map((v) => `  ${v}`).join('\n')}
   // Ensure there's an extra blank line after enums so models are separated
   const enumSection = enumBlocks ? enumBlocks + '\n' : ''
 
-  const body = Object.entries(models).map(([name, { fields, relationFields }]) => {
-    const all = [...fields, ...relationFields]
+  const body = Object.entries(models).map(([name, { fields, relationFields, constraints }]) => {
+    const all = [...fields, ...relationFields, ...constraints]
     return `model ${name} {
 ${all.join('\n')}
 }

@@ -55,7 +55,7 @@ Core types live in `src/types.ts`:
 
 React Flow `Node` data contains `TableNodeData`, which is defined in `src/components/TableNode.tsx`. Its fields and callbacks describe a table and how it edits itself.
 
-React Flow `Edge` data contains a `relationType` of `one-to-one`, `one-to-many`, or `many-to-many`. Relation UI is implemented in `src/components/RelationEdge.tsx`.
+React Flow `Edge` data contains a `relationType` of `one-to-one` or `one-to-many`. Selecting many-to-many opens a confirmation to replace the edge with a junction table and two one-to-many edges.
 
 ## Persistence
 
@@ -97,7 +97,7 @@ Important invariants:
 - Referenced enums only are included in the generated schema.
 - Primary-key strategies map to `@id` plus `autoincrement()`, `cuid()`, or `uuid()` where applicable.
 - One-to-one and one-to-many relations add foreign-key fields and relation fields.
-- Many-to-many relations emit array relation fields on both models.
+- Confirmed many-to-many relationships are represented by a junction node with two foreign-key fields, a unique constraint across those keys, and one-to-many edges from each related model.
 
 Changes to fields, edge data, enum data, or relation semantics must keep this generator and the corresponding UI in sync.
 
