@@ -145,6 +145,14 @@ export function generatePrismaSchema(
       const foreignKeyFields = fields.filter((field) => field.fk).map((field) => field.name)
       if (foreignKeyFields.length === 2) {
         models[modelName].constraints.push(`  @@unique([${foreignKeyFields.join(', ')}])`)
+        // Index design best practice: index the junction foreign keys so
+        // lookups joining through the junction are seek operations.
+        for (const fk of foreignKeyFields) {
+          const indexLine = `  @@index([${fk}])`
+          if (!models[modelName].constraints.includes(indexLine)) {
+            models[modelName].constraints.push(indexLine)
+          }
+        }
       }
     }
   }
@@ -170,18 +178,24 @@ export function generatePrismaSchema(
       const srcPkType = toPrismaType(srcPk?.type ?? 'Int')
 
       const fkName = `${String((src.data as any)?.name)}_id`
-      if (!hasModelField(tgtModel, fkName)) {
-        models[tgtModel].fields.push(`  ${fkName} ${srcPkType}`)
-        // Index design best practice: foreign key columns used in join
-        // predicates should be indexed so lookups against the referenced key
-        // are seek operations instead of table scans.
-        const fkIndexLine = `  @@index([${fkName}])`
-        if (!models[tgtModel].constraints.includes(fkIndexLine)) {
-          models[tgtModel].constraints.push(fkIndexLine)
+      if (tgt.data?.junctionTable === true) {
+        // Junction tables already declare their foreign keys as actual primary
+        // key fields on the junction node, so wire the relation without pushing
+        // a duplicate foreign key field (e.g. avoid "product_id" next to the real
+        // primary key based FK like "code").
+        models[tgtModel].relationFields.push(`  ${String((src.data as any)?.name)} ${srcModel} @relation(fields: [${srcPkName}], references: [${srcPkName}])`)
+        models[srcModel].relationFields.push(`  ${pluralizeRelationName(String((tgt.data as any)?.name))} ${tgtModel}[]`)
+      } else {
+        if (!hasModelField(tgtModel, fkName)) {
+          models[tgtModel].fields.push(`  ${fkName} ${srcPkType}`)
+          const fkIndexLine = `  @@index([${fkName}])`
+          if (!models[tgtModel].constraints.includes(fkIndexLine)) {
+            models[tgtModel].constraints.push(fkIndexLine)
+          }
         }
+        models[tgtModel].relationFields.push(`  ${String((src.data as any)?.name)} ${srcModel} @relation(fields: [${fkName}], references: [${srcPkName}])`)
+        models[srcModel].relationFields.push(`  ${pluralizeRelationName(String((tgt.data as any)?.name))} ${tgtModel}[]`)
       }
-      models[tgtModel].relationFields.push(`  ${String((src.data as any)?.name)} ${srcModel} @relation(fields: [${fkName}], references: [${srcPkName}])`)
-      models[srcModel].relationFields.push(`  ${pluralizeRelationName(String((tgt.data as any)?.name))} ${tgtModel}[]`)
     } else if (relationType === 'one-to-one') {
       const srcFields = (src.data?.fields ?? []) as Field[]
       const srcPk = srcFields.find((f: Field) => f.pk)
