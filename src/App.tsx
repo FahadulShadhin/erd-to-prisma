@@ -1205,7 +1205,7 @@ function AppContent({
         {nodes.length === 0 && (
           <div className="canvas-empty-state">
             <strong>Drag an Entity here to get started.</strong>
-            <span>Add fields and connect entities, then select Prisma to generate your schema.</span>
+            <span>Add fields and connect entities, then select Schema to generate your Prisma schema.</span>
           </div>
         )}
         <ReactFlow

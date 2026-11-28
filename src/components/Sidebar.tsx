@@ -151,8 +151,8 @@ export default function Sidebar({
       </div>
 
       <button className="build-button" onClick={handleBuildPrisma}>
-        <img src={buildIcon} alt="Build Prisma" style={{ width: '16px', height: '16px' }} />
-        <span className="dnd-table-header">Prisma</span>
+        <img src={buildIcon} alt="" style={{ width: '16px', height: '16px' }} />
+        <span className="dnd-table-header">Schema</span>
       </button>
 
       <div className="sidebar-diagrams">

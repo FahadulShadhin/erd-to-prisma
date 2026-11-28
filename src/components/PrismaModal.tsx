@@ -19,6 +19,7 @@ export default function PrismaModal({ open, schema, rawSql, onClose }: Props) {
   if (!open) return null
 
   const activeContent = activeTab === 'sql' ? (rawSql ?? '') : schema
+  const fileName = activeTab === 'sql' ? 'schema.sql' : 'schema.prisma'
 
   const handleCopy = async () => {
     try {
@@ -34,7 +35,7 @@ export default function PrismaModal({ open, schema, rawSql, onClose }: Props) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = activeTab === 'sql' ? 'schema.sql' : 'schema.prisma'
+    a.download = fileName
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -45,7 +46,7 @@ export default function PrismaModal({ open, schema, rawSql, onClose }: Props) {
     <div className="prisma-modal-overlay" role="dialog" aria-modal="true">
       <div className="prisma-modal">
         <div className="prisma-modal-header">
-          <div className="prisma-modal-title">schema.prisma</div>
+          <div className="prisma-modal-title">{fileName}</div>
           <div className="prisma-modal-actions">
             <button
               className="btn icon-btn"
@@ -59,7 +60,7 @@ export default function PrismaModal({ open, schema, rawSql, onClose }: Props) {
             <button
               className="btn icon-btn"
               onClick={handleDownload}
-              aria-label="Download schema.prisma"
+              aria-label={`Download ${fileName}`}
               title="Download"
             >
               <img src={downloadIcon} alt="Download" />
