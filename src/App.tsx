@@ -78,13 +78,12 @@ function getTableDeletionIds(deletedIds: string[], nodes: Node[], edges: Edge[])
   return ids
 }
 
-function getJunctionTableName(sourceName: string, targetName: string, nodes: Node[]) {
+function getUniqueJunctionName(sourceName: string, targetName: string, existingNames: Set<string>) {
   // Junction table names follow the "<tableOne>_<tableTwo>" convention,
   // e.g. "purchase_product" for a Purchase -> Product relationship.
   const sourceKey = String(sourceName).toLowerCase().replace(/[^A-Za-z0-9_]/g, '')
   const targetKey = String(targetName).toLowerCase().replace(/[^A-Za-z0-9_]/g, '')
   const baseName = `${sourceKey}_${targetKey}`.replace(/^_+|_+$/g, '') || 'Junction'
-  const existingNames = new Set(nodes.map((node) => String(node.data?.name ?? '').toLowerCase()))
   let name = baseName
   let suffix = 2
   while (existingNames.has(name.toLowerCase())) {
@@ -92,6 +91,11 @@ function getJunctionTableName(sourceName: string, targetName: string, nodes: Nod
     suffix += 1
   }
   return name
+}
+
+function getJunctionTableName(sourceName: string, targetName: string, nodes: Node[]) {
+  const existingNames = new Set(nodes.map((node) => String((node.data as { name?: string } | undefined)?.name ?? '').toLowerCase()))
+  return getUniqueJunctionName(sourceName, targetName, existingNames)
 }
 
 function getForeignKeyFieldType(field?: Field) {
@@ -162,10 +166,10 @@ function getJunctionForeignKeyFields(junction: Node, relatedNodes: Node[]): Fiel
   ]
 }
 
-// Junction fields are derived data. Whenever a connected table changes,
-// rebuild them from the current primary keys so the junction node never
-// becomes independently editable state.
-function syncJunctionFields(nodesAfterEdit: Node[], currentEdges: Edge[]): Node[] {
+// Junction fields are derived from the connected tables' primary keys. When
+// `renameJunctions` is true (a connected table was renamed), regenerate the
+// read-only junction names too.
+function syncJunctionTables(nodesAfterEdit: Node[], currentEdges: Edge[], renameJunctions = false): Node[] {
   const junctionIds = new Set<string>()
   for (const edge of currentEdges) {
     for (const endpointId of [edge.source, edge.target]) {
@@ -175,6 +179,11 @@ function syncJunctionFields(nodesAfterEdit: Node[], currentEdges: Edge[]): Node[
   }
   if (junctionIds.size === 0) return nodesAfterEdit
 
+  const reservedNames = renameJunctions
+    ? new Set(
+        nodesAfterEdit.map((node) => String((node.data as { name?: string } | undefined)?.name ?? '').toLowerCase())
+      )
+    : null
   const junctionUpdates = new Map<string, Record<string, unknown>>()
   for (const junctionId of junctionIds) {
     const junction = nodesAfterEdit.find((node) => node.id === junctionId)
@@ -197,9 +206,20 @@ function syncJunctionFields(nodesAfterEdit: Node[], currentEdges: Edge[]): Node[
     // A partially connected junction cannot derive its two foreign keys yet.
     if (relatedNodes.length < 2) continue
 
+    let generatedName: string | undefined
+    if (reservedNames) {
+      const junctionData = junction.data as unknown as TableNodeData
+      reservedNames.delete(String(junctionData.name ?? '').toLowerCase())
+      const sourceName = (relatedNodes[0].data as unknown as TableNodeData).name || relatedNodes[0].id
+      const targetName = (relatedNodes[1].data as unknown as TableNodeData).name || relatedNodes[1].id
+      generatedName = getUniqueJunctionName(sourceName, targetName, reservedNames)
+      reservedNames.add(generatedName.toLowerCase())
+    }
+
     const fields = getJunctionForeignKeyFields(junction, relatedNodes)
     junctionUpdates.set(junctionId, {
       ...(junction.data as unknown as Record<string, unknown>),
+      ...(generatedName !== undefined ? { name: generatedName } : {}),
       fields,
     })
   }
@@ -938,7 +958,7 @@ function FlowCanvasWrapper({
         const newFields = d.fields.map((f) => (f.type === name ? { ...f, type: 'String' } : f))
         return { ...n, data: { ...d, fields: newFields } }
       })
-      return syncJunctionFields(nodesAfterEdit, edges)
+      return syncJunctionTables(nodesAfterEdit, edges)
     })
   }
 
@@ -963,9 +983,6 @@ function FlowCanvasWrapper({
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((node) => ({
       ...node,
-      // Junction tables are derived from their connected tables, so they
-      // cannot be removed independently with the Delete key.
-      deletable: !isJunctionTable(node),
       data: {
         ...(node.data as unknown as TableNodeData),
         openEnumModal: (index: number, prevType?: string) => openEnumEditor(node.id, index, prevType),
@@ -1008,7 +1025,7 @@ function FlowCanvasWrapper({
             // Keep junction tables that reference this table in sync when the
             // primary key (or its field name/type) changes. Compute against the
             // post-edit node so renamed/changed primary keys propagate.
-            return syncJunctionFields(nodesAfterEdit, edges)
+            return syncJunctionTables(nodesAfterEdit, edges)
           })
         },
         addRow: () => {
@@ -1052,12 +1069,12 @@ function FlowCanvasWrapper({
                 ? { ...n, data: { ...(n.data as unknown as TableNodeData), name } }
                 : n
             )
-            // Connected table names are part of junction foreign key names when
-            // both tables use the same primary key name.
-            return syncJunctionFields(nodesAfterEdit, edges)
+            // Connected table names drive both junction foreign key names and
+            // the generated junction table name.
+            return syncJunctionTables(nodesAfterEdit, edges, true)
           })
         },
-        deleteTable: isJunctionTable(node) ? undefined : () => {
+        deleteTable: () => {
           const idsToDelete = getTableDeletionIds([node.id], nodes, edges)
           setNodes((nds) => nds.filter((n) => !idsToDelete.has(n.id)))
           setEdges((eds) => eds.filter((e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target)))
@@ -1211,7 +1228,7 @@ function FlowCanvasWrapper({
                 }
                 return n
               })
-              return syncJunctionFields(nodesAfterEdit, edges)
+              return syncJunctionTables(nodesAfterEdit, edges)
             })
           }
           closeEnumEditor()

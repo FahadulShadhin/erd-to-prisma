@@ -151,13 +151,13 @@ export default function TableNode({ id, data }: { id: string; data: TableNodeDat
           <div 
             className="table-name"
             onDoubleClick={readOnly ? undefined : handleNameDoubleClick}
-            title={readOnly ? 'Junction table fields are managed by the connected tables' : 'Double-click to edit'}
+            title={readOnly ? 'Junction table name and fields follow the connected tables' : 'Double-click to edit'}
           >
             {data.name}
           </div>
         )}
 
-        {!readOnly && data.deleteTable && (
+        {data.deleteTable && (
           <button 
             className="delete-table-btn"
             onClick={data.deleteTable}
