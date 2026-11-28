@@ -510,6 +510,12 @@ input[type="checkbox"] {
   flex-direction: column;
 }
 
+.prisma-modal-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .prisma-schema-textarea {
   width: 100%;
   /* limit height so modal header/actions stay visible */
@@ -616,8 +622,8 @@ input[type="checkbox"] {
   background: var(--color-accent); 
   color: #fff; 
   border-color: var(--color-accent);
-  padding: 4px 8px !important;
-  border-radius: 8px !important;
+  padding: 4px 8px;
+  border-radius: 8px;
   font-size: 14px;
   font-weight: inherit;
 }
@@ -625,6 +631,17 @@ input[type="checkbox"] {
 .btn.secondary {
   font-size: 14px;
   font-weight: inherit;
+}
+
+/* Schema modal tabs must look identical when active and inactive.
+   Without this, the global `button` font-size/weight and the
+   `.btn.primary` overrides make the button change size on click. */
+.prisma-modal-body .prisma-modal-tabs .btn {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: inherit;
+  font-family: inherit;
 }
 
 /* Type dropdown styles (custom select) */

@@ -8,6 +8,7 @@ import type { Node, Edge } from '@xyflow/react'
 import { useContext, useState } from 'react'
 import { NodesContext } from '../context/NodesContext'
 import { generatePrismaSchema } from '../utils/generatePrisma'
+import { generateRawSql } from '../utils/generateRawSql'
 import PrismaModal from './PrismaModal'
 import type { DiagramListItem } from '../types'
 import type { DiagramData } from '../services/diagram-api'
@@ -75,6 +76,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const nodesContext = useContext(NodesContext)
   const [schema, setSchema] = useState<string>('')
+  const [rawSql, setRawSql] = useState<string>('')
   const [open, setOpen] = useState(false)
   const [editingDiagramId, setEditingDiagramId] = useState<string | null>(null)
   const [diagramNameDraft, setDiagramNameDraft] = useState('')
@@ -105,7 +107,12 @@ export default function Sidebar({
         nodesContext.edges as Edge[],
         nodesContext.enums || []
       )
+      const rawSql = generateRawSql(
+        nodesContext.nodes as Node[],
+        nodesContext.edges as Edge[]
+      )
       setSchema(schema)
+      setRawSql(rawSql)
       setOpen(true)
     } else {
       console.log('No data available yet')
@@ -144,8 +151,8 @@ export default function Sidebar({
       </div>
 
       <button className="build-button" onClick={handleBuildPrisma}>
-        <img src={buildIcon} alt="Build Prisma" style={{ width: '16px', height: '16px' }} />
-        <span className="dnd-table-header">Prisma</span>
+        <img src={buildIcon} alt="" style={{ width: '16px', height: '16px' }} />
+        <span className="dnd-table-header">Schema</span>
       </button>
 
       <div className="sidebar-diagrams">
@@ -279,7 +286,7 @@ export default function Sidebar({
         <span>{theme === 'light' ? 'Dark' : 'Light'}</span>
       </button>
       {/* Enums list removed from sidebar per request */}
-      <PrismaModal open={open} schema={schema} onClose={() => setOpen(false)} />
+      <PrismaModal open={open} schema={schema} rawSql={rawSql} onClose={() => setOpen(false)} />
       {diagramPendingDelete && (
         <div
           className="delete-diagram-overlay"
