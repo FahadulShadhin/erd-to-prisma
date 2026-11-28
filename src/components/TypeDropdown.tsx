@@ -17,7 +17,7 @@ export default function TypeDropdown({ nodeId, index, field, updateField, openEn
   const enums = ctx?.enums ?? []
   const removeEnum = (name?: string) => {
     if (!name) return
-    ctx?.removeEnum && ctx.removeEnum(name)
+    ctx?.removeEnum?.(name)
   }
 
   const buttonRef = useRef<HTMLButtonElement | null>(null)
@@ -42,7 +42,7 @@ export default function TypeDropdown({ nodeId, index, field, updateField, openEn
       const target = e.target as Node | null
       if (buttonRef.current && buttonRef.current.contains(target)) return
       if (portalRef.current && portalRef.current.contains(target)) return
-      ctx?.closeFieldDropdown && ctx.closeFieldDropdown()
+      ctx?.closeFieldDropdown?.()
     }
     document.addEventListener('click', onDoc)
     return () => document.removeEventListener('click', onDoc)
@@ -75,19 +75,19 @@ export default function TypeDropdown({ nodeId, index, field, updateField, openEn
       onClick={(e) => e.stopPropagation()}
     >
       {field.pk && pkOptions.map((p) => (
-        <div key={p} className="type-option" onClick={() => { updateField(index, 'type', p); ctx?.closeFieldDropdown && ctx.closeFieldDropdown() }}>
+        <div key={p} className="type-option" onClick={() => { updateField(index, 'type', p); ctx?.closeFieldDropdown?.() }}>
           {p}
         </div>
       ))}
       {primitives.map((p) => (
-        <div key={p} className="type-option" onClick={() => { updateField(index, 'type', p); ctx?.closeFieldDropdown && ctx.closeFieldDropdown() }}>
+        <div key={p} className="type-option" onClick={() => { updateField(index, 'type', p); ctx?.closeFieldDropdown?.() }}>
           {p.toLowerCase()}
         </div>
       ))}
       <div className="type-divider">Enums</div>
-      <div className="type-option create" onClick={() => { openEnumModal?.(index, field.type); ctx?.closeFieldDropdown && ctx.closeFieldDropdown() }}>+ Create enum...</div>
+      <div className="type-option create" onClick={() => { openEnumModal?.(index, field.type); ctx?.closeFieldDropdown?.() }}>+ Create enum...</div>
       {enums.map((e) => (
-        <div key={e.name} className="type-option enum-option" onClick={() => { updateField(index, 'type', e.name); ctx?.closeFieldDropdown && ctx.closeFieldDropdown() }}>
+        <div key={e.name} className="type-option enum-option" onClick={() => { updateField(index, 'type', e.name); ctx?.closeFieldDropdown?.() }}>
           <span className="enum-option-name">{e.name}</span>
           <button className="type-option-delete" onClick={(ev) => { ev.stopPropagation(); removeEnum(e.name) }} title={`Delete ${e.name}`}>
             <img src={crossIcon} alt={`Delete ${e.name}`} className="type-option-delete-icon" />
@@ -109,7 +109,7 @@ export default function TypeDropdown({ nodeId, index, field, updateField, openEn
           // by the document handler.
           ignoreDocClickRef.current = true
           openIgnoreUntilRef.current = Date.now() + 200
-          ctx?.openFieldDropdown && ctx.openFieldDropdown(nodeId, index)
+          ctx?.openFieldDropdown?.(nodeId, index)
         }}
       >
         {field.type}

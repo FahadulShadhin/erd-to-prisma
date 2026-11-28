@@ -36,6 +36,33 @@
   position: relative;
 }
 
+.table-node.junction-table .table-name {
+  cursor: default;
+}
+
+.table-node.junction-table .table-name:hover {
+  background: transparent;
+}
+
+.table-node.junction-table .field-row:not(.header-row):hover {
+  background: transparent;
+}
+
+.table-node.junction-table input[type="checkbox"]:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.field-readonly-value {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 14px;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .junction-table-label {
   position: absolute;
   top: -9px;

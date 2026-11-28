@@ -55,7 +55,7 @@ Core types live in `src/types.ts`:
 
 React Flow `Node` data contains `TableNodeData`, which is defined in `src/components/TableNode.tsx`. Its fields and callbacks describe a table and how it edits itself.
 
-React Flow `Edge` data contains a `relationType` of `one-to-one` or `one-to-many`. Selecting many-to-many opens a confirmation to replace the edge with a junction table and two one-to-many edges.
+React Flow `Edge` data contains a `relationType` of `one-to-one` or `one-to-many`. Selecting many-to-many opens a confirmation to replace the edge with a junction table and two one-to-many edges. Junction tables are read-only on the canvas: they cannot be deleted directly, and their fields are derived from the connected tables' primary keys and names, updating when those keys or table names change. Deleting either connected table also deletes its junction table.
 
 ## Persistence
 

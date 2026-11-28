@@ -31,9 +31,11 @@ export interface TableNodeData {
 export default function TableNode({ id, data }: { id: string; data: TableNodeData }) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState(data.name);
+  const readOnly = data.junctionTable === true;
 
 
   const handleNameDoubleClick = () => {
+    if (readOnly) return;
     setIsEditingName(true);
     setTempName(data.name);
   };
@@ -148,14 +150,14 @@ export default function TableNode({ id, data }: { id: string; data: TableNodeDat
         ) : (
           <div 
             className="table-name"
-            onDoubleClick={handleNameDoubleClick}
-            title="Double-click to edit"
+            onDoubleClick={readOnly ? undefined : handleNameDoubleClick}
+            title={readOnly ? 'Junction table fields are managed by the connected tables' : 'Double-click to edit'}
           >
             {data.name}
           </div>
         )}
 
-        {data.deleteTable && (
+        {!readOnly && data.deleteTable && (
           <button 
             className="delete-table-btn"
             onClick={data.deleteTable}
@@ -190,19 +192,22 @@ export default function TableNode({ id, data }: { id: string; data: TableNodeDat
               deleteRow={data.deleteRow}
               onPkToggle={handlePkToggle}
               openEnumModal={data.openEnumModal}
+              readOnly={readOnly}
             />
           ))}
 
           {/* Add Row Button */}
-          <div className="add-row-container">
-            <button 
-              className="add-row-btn"
-              onClick={data.addRow}
-              title="Add new field"
-            >
-              <img src={plusIcon} alt="Add field" className="add-row-icon" />
-            </button>
-          </div>
+          {!readOnly && (
+            <div className="add-row-container">
+              <button 
+                className="add-row-btn"
+                onClick={data.addRow}
+                title="Add new field"
+              >
+                <img src={plusIcon} alt="Add field" className="add-row-icon" />
+              </button>
+            </div>
+          )}
       </div>
       
     </div>
@@ -213,15 +218,38 @@ interface FieldRowProps {
   nodeId: string;
   field: Field;
   index: number;
-  updateField: (index: number, key: keyof Field, value: any) => void;
+  updateField: UpdateFieldFn;
   deleteRow: (index: number) => void;
   onPkToggle?: (index: number, isPk: boolean) => void;
   openEnumModal?: (index: number, prevType?: string) => void;
+  readOnly?: boolean;
 }
-function FieldRow({ nodeId, field, index, updateField, deleteRow, onPkToggle, openEnumModal }: FieldRowProps) {
-  
-
-    
+function FieldRow({ nodeId, field, index, updateField, deleteRow, onPkToggle, openEnumModal, readOnly = false }: FieldRowProps) {
+  if (readOnly) {
+    return (
+      <div className="field-row readonly-row">
+        <div className="field-cell pk-cell">
+          <input type="checkbox" checked={field.pk} disabled title="Primary Key" />
+        </div>
+        <div className="field-cell name-cell">
+          <span className="field-readonly-value">{field.name}</span>
+        </div>
+        <div className="field-cell type-cell">
+          <span className="field-readonly-value">{field.type}</span>
+        </div>
+        <div className="field-cell nullable-cell">
+          <input type="checkbox" checked={field.nullable} disabled title="Nullable" />
+        </div>
+        <div className="field-cell unique-cell">
+          <input type="checkbox" checked={field.unique} disabled title="Unique" />
+        </div>
+        <div className="field-cell index-cell">
+          <input type="checkbox" checked={!!field.index} disabled title="Index" />
+        </div>
+        <div className="field-cell actions-cell" />
+      </div>
+    );
+  }
 
   return (
     <div className="field-row">

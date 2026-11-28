@@ -10,8 +10,9 @@ interface Props {
 }
 
 export default function TemplateModal({ open, schema, onClose }: Props) {
-  if (!open) return null
   const [generating, setGenerating] = useState<'js' | 'ts' | null>(null)
+
+  if (!open) return null
 
   const handleExpress = async (typescript: boolean) => {
     try {
@@ -20,7 +21,7 @@ export default function TemplateModal({ open, schema, onClose }: Props) {
       const files = await generateExpressTemplates(schema, { appName: 'prisma-express-app', typescript })
 
       // Load JSZip (try local, fallback to CDN if needed)
-      let JSZip: any
+      let JSZip: typeof import('jszip')
       try {
         JSZip = (await import('jszip')).default
       } catch (localErr) {

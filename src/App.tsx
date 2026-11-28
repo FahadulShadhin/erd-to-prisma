@@ -1,6 +1,6 @@
 import './App.css'
 import { ReactFlow, Background, Controls, useNodesState, useEdgesState, ReactFlowProvider, useReactFlow } from '@xyflow/react'
-import type { Node, Edge, Connection } from '@xyflow/react'
+import type { Node, Edge, Connection, NodeChange } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import TableNode, { type TableNodeData } from './components/TableNode'
 import type { DiagramListItem, Field } from './types'
@@ -56,6 +56,26 @@ function getNodeIdSeed(nodes: Node[]): number {
     const nodeId = Number(node.id)
     return Number.isSafeInteger(nodeId) ? Math.max(highestId, nodeId) : highestId
   }, 3)
+}
+
+function isJunctionTable(node: Node): boolean {
+  return (node.data as { junctionTable?: boolean } | undefined)?.junctionTable === true
+}
+
+// Deleting a table that participates in a many-to-many relationship must also
+// remove the junction table derived from it; otherwise the junction is left
+// with stale foreign keys and dangling relations.
+function getTableDeletionIds(deletedIds: string[], nodes: Node[], edges: Edge[]): Set<string> {
+  const ids = new Set(deletedIds)
+  for (const edge of edges) {
+    const sourceDeleted = ids.has(edge.source)
+    const targetDeleted = ids.has(edge.target)
+    if (!sourceDeleted && !targetDeleted) continue
+    const otherId = sourceDeleted ? edge.target : edge.source
+    const otherNode = nodes.find((node) => node.id === otherId)
+    if (otherNode && isJunctionTable(otherNode)) ids.add(otherId)
+  }
+  return ids
 }
 
 function getJunctionTableName(sourceName: string, targetName: string, nodes: Node[]) {
@@ -140,6 +160,54 @@ function getJunctionForeignKeyFields(junction: Node, relatedNodes: Node[]): Fiel
       unique: false,
     },
   ]
+}
+
+// Junction fields are derived data. Whenever a connected table changes,
+// rebuild them from the current primary keys so the junction node never
+// becomes independently editable state.
+function syncJunctionFields(nodesAfterEdit: Node[], currentEdges: Edge[]): Node[] {
+  const junctionIds = new Set<string>()
+  for (const edge of currentEdges) {
+    for (const endpointId of [edge.source, edge.target]) {
+      const endpoint = nodesAfterEdit.find((node) => node.id === endpointId)
+      if (endpoint && isJunctionTable(endpoint)) junctionIds.add(endpoint.id)
+    }
+  }
+  if (junctionIds.size === 0) return nodesAfterEdit
+
+  const junctionUpdates = new Map<string, Record<string, unknown>>()
+  for (const junctionId of junctionIds) {
+    const junction = nodesAfterEdit.find((node) => node.id === junctionId)
+    if (!junction) continue
+
+    const junctionEdges = currentEdges.filter((edge) => edge.source === junctionId || edge.target === junctionId)
+    const relatedNodes: Node[] = []
+    for (const edge of junctionEdges) {
+      const relatedId = edge.source === junctionId ? edge.target : edge.source
+      const relatedNode = nodesAfterEdit.find((node) => node.id === relatedId)
+      if (
+        relatedNode &&
+        relatedNode.id !== junctionId &&
+        !isJunctionTable(relatedNode) &&
+        !relatedNodes.some((node) => node.id === relatedId)
+      ) {
+        relatedNodes.push(relatedNode)
+      }
+    }
+    // A partially connected junction cannot derive its two foreign keys yet.
+    if (relatedNodes.length < 2) continue
+
+    const fields = getJunctionForeignKeyFields(junction, relatedNodes)
+    junctionUpdates.set(junctionId, {
+      ...(junction.data as unknown as Record<string, unknown>),
+      fields,
+    })
+  }
+
+  return nodesAfterEdit.map((node) => {
+    const junctionData = junctionUpdates.get(node.id)
+    return junctionData ? { ...node, data: junctionData } : node
+  })
 }
 
 function getJunctionEdgeHandles(firstNode: Node, secondNode: Node) {
@@ -860,15 +928,18 @@ function FlowCanvasWrapper({
 
   const removeEnum = (name: string) => {
     setEnums((prev) => prev.filter((x) => x.name !== name))
-    // revert any fields that used this enum back to String
-    setNodes((nds) =>
-      nds.map((n) => {
+    // Revert any fields that used this enum back to String. Junction fields
+    // are derived from connected primary keys and are never edited here.
+    setNodes((nds) => {
+      const nodesAfterEdit = nds.map((n) => {
+        if (isJunctionTable(n)) return n
         const d = n.data as unknown as TableNodeData
         if (!d || !d.fields) return n
-        const newFields = (d.fields || []).map((f) => (f.type === name ? { ...f, type: 'String' } : f))
+        const newFields = d.fields.map((f) => (f.type === name ? { ...f, type: 'String' } : f))
         return { ...n, data: { ...d, fields: newFields } }
       })
-    )
+      return syncJunctionFields(nodesAfterEdit, edges)
+    })
   }
 
   const openEnumEditor = (nodeId: string, fieldIndex: number, prevType?: string) => {
@@ -892,6 +963,9 @@ function FlowCanvasWrapper({
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((node) => ({
       ...node,
+      // Junction tables are derived from their connected tables, so they
+      // cannot be removed independently with the Delete key.
+      deletable: !isJunctionTable(node),
       data: {
         ...(node.data as unknown as TableNodeData),
         openEnumModal: (index: number, prevType?: string) => openEnumEditor(node.id, index, prevType),
@@ -917,91 +991,100 @@ function FlowCanvasWrapper({
           )
         },
         updateField: (index: number, key: keyof Field, value: Field[keyof Field]) => {
-          setNodes((nds) =>
-            nds.map((n) => {
-              if (n.id !== node.id) {
-                return n
-              }
-              const tableData = n.data as unknown as TableNodeData
-              const newFields = [...tableData.fields]
-              newFields[index] = { ...newFields[index], [key]: value }
-              const next = { ...n, data: { ...tableData, fields: newFields } }
-              if (key !== 'pk' && key !== 'name') {
-                return next
-              }
-              // Keep junction tables that reference this table in sync when the
-              // primary key (or its field name) changes.
-              const junctionIds = new Set<string>()
-              for (const e of edges) {
-                const otherId = e.source === n.id ? e.target : e.target === n.id ? e.source : null
-                if (!otherId) continue
-                const other = nds.find((candidate) => candidate.id === otherId)
-                if (other && (other.data as { junctionTable?: boolean })?.junctionTable === true) {
-                  junctionIds.add(otherId)
-                }
-              }
-              let updated = next
-              for (const junctionId of junctionIds) {
-                const junction = nds.find((candidate) => candidate.id === junctionId)
-                if (!junction) continue
-                const junctionEdges = edges.filter((e) => e.source === junctionId || e.target === junctionId)
-                const relatedNodes: Node[] = []
-                for (const e of junctionEdges) {
-                  const table = nds.find((candidate) => candidate.id === e.source)
-                  if (table && table.id !== junctionId) {
-                    relatedNodes.push(table)
-                  }
-                }
-                const fields = getJunctionForeignKeyFields(junction, relatedNodes)
-                const junctionData = { ...(junction.data as unknown as TableNodeData), fields }
-                updated = { ...updated, data: junctionData }
-              }
-              return updated
-            })
-          )
+          setNodes((nds) => {
+            const editedNode = nds.find((n) => n.id === node.id)
+            if (!editedNode || isJunctionTable(editedNode)) return nds
+
+            const tableData = editedNode.data as unknown as TableNodeData
+            const newFields = [...tableData.fields]
+            newFields[index] = { ...newFields[index], [key]: value }
+            const next = { ...editedNode, data: { ...tableData, fields: newFields } }
+
+            const nodesAfterEdit = nds.map((n) => (n.id === node.id ? next : n))
+            if (key !== 'pk' && key !== 'name' && key !== 'type') {
+              return nodesAfterEdit
+            }
+
+            // Keep junction tables that reference this table in sync when the
+            // primary key (or its field name/type) changes. Compute against the
+            // post-edit node so renamed/changed primary keys propagate.
+            return syncJunctionFields(nodesAfterEdit, edges)
+          })
         },
         addRow: () => {
           setNodes((nds) =>
-            nds.map((n) =>
-              n.id === node.id
-                ? {
-                    ...n,
-                    data: {
-                      ...(n.data as unknown as TableNodeData),
-                      fields: [
-                        ...(n.data as unknown as TableNodeData).fields,
-                        { name: '', type: 'String', pk: false, fk: false, nullable: false, unique: false },
-                      ],
-                    },
-                  }
-                : n
-            )
+            nds.map((n) => {
+              if (n.id !== node.id || isJunctionTable(n)) return n
+              const tableData = n.data as unknown as TableNodeData
+              return {
+                ...n,
+                data: {
+                  ...tableData,
+                  fields: [
+                    ...tableData.fields,
+                    { name: '', type: 'String', pk: false, fk: false, nullable: false, unique: false },
+                  ],
+                },
+              }
+            })
           )
         },
         deleteRow: (index: number) => {
           setNodes((nds) =>
             nds.map((n) => {
-              if (n.id === node.id) {
-                const tableData = n.data as unknown as TableNodeData
-                const newFields = tableData.fields.filter((_: Field, i: number) => i !== index)
-                return { ...n, data: { ...tableData, fields: newFields } }
-              }
-              return n
+              if (n.id !== node.id || isJunctionTable(n)) return n
+              const tableData = n.data as unknown as TableNodeData
+              // Primary keys drive relations and junction fields; they cannot
+              // be removed, even if a caller bypasses the hidden delete button.
+              if (tableData.fields[index]?.pk) return n
+              const newFields = tableData.fields.filter((_: Field, i: number) => i !== index)
+              return { ...n, data: { ...tableData, fields: newFields } }
             })
           )
         },
         updateTableName: (name: string) => {
-          setNodes((nds) =>
-            nds.map((n) => (n.id === node.id ? { ...n, data: { ...(n.data as unknown as TableNodeData), name } } : n))
-          )
+          setNodes((nds) => {
+            const editedNode = nds.find((n) => n.id === node.id)
+            if (!editedNode || isJunctionTable(editedNode)) return nds
+            if ((editedNode.data as unknown as TableNodeData).name === name) return nds
+            const nodesAfterEdit = nds.map((n) =>
+              n.id === node.id
+                ? { ...n, data: { ...(n.data as unknown as TableNodeData), name } }
+                : n
+            )
+            // Connected table names are part of junction foreign key names when
+            // both tables use the same primary key name.
+            return syncJunctionFields(nodesAfterEdit, edges)
+          })
         },
-        deleteTable: () => {
-          setNodes((nds) => nds.filter((n) => n.id !== node.id))
-          setEdges((eds) => eds.filter((e) => e.source !== node.id && e.target !== node.id))
+        deleteTable: isJunctionTable(node) ? undefined : () => {
+          const idsToDelete = getTableDeletionIds([node.id], nodes, edges)
+          setNodes((nds) => nds.filter((n) => !idsToDelete.has(n.id)))
+          setEdges((eds) => eds.filter((e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target)))
         },
       },
     }))
   }, [nodes, setNodes, setEdges, edges])
+
+  const handleNodesChange = useCallback((changes: NodeChange<Node>[]) => {
+    const removedIds = changes
+      .filter((change) => change.type === 'remove')
+      .map((change) => (change as { id: string }).id)
+    if (removedIds.length === 0) {
+      onNodesChange(changes)
+      return
+    }
+
+    const idsToDelete = getTableDeletionIds(removedIds, nodes, edges)
+    const junctionIds = [...idsToDelete].filter((id) => !removedIds.includes(id))
+    const edgeNodeIds = new Set([...removedIds, ...junctionIds])
+
+    onNodesChange(changes)
+    setEdges((eds) => eds.filter((edge) => !edgeNodeIds.has(edge.source) && !edgeNodeIds.has(edge.target)))
+    if (junctionIds.length > 0) {
+      setNodes((nds) => nds.filter((node) => !junctionIds.includes(node.id)))
+    }
+  }, [edges, nodes, onNodesChange, setEdges, setNodes])
 
   // Render EnumModal globally so it is not constrained by React Flow node layering
 
@@ -1061,7 +1144,7 @@ function FlowCanvasWrapper({
         }}
         nodes={nodesWithCallbacks}
         edges={edgesWithCallbacks}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onReconnect={onReconnect}
@@ -1116,8 +1199,10 @@ function FlowCanvasWrapper({
           // register enum globally and set the node's field type
           addEnum({ name, values })
           if (enumEditor.nodeId !== undefined && typeof enumEditor.fieldIndex === 'number') {
-            setNodes((nds) =>
-              nds.map((n) => {
+            setNodes((nds) => {
+              const editedNode = nds.find((n) => n.id === enumEditor.nodeId)
+              if (!editedNode || isJunctionTable(editedNode)) return nds
+              const nodesAfterEdit = nds.map((n) => {
                 if (n.id === enumEditor.nodeId) {
                   const d = n.data as unknown as TableNodeData
                   const newFields = [...(d.fields || [])]
@@ -1126,7 +1211,8 @@ function FlowCanvasWrapper({
                 }
                 return n
               })
-            )
+              return syncJunctionFields(nodesAfterEdit, edges)
+            })
           }
           closeEnumEditor()
         }}

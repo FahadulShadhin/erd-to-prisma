@@ -10,6 +10,30 @@ type Field = {
   index?: boolean
 }
 
+type TableNodeData = {
+  name?: string
+  fields?: Field[]
+  junctionTable?: boolean
+}
+
+type RelationType = 'one-to-one' | 'one-to-many' | 'many-to-many'
+
+type RelationEdgeData = {
+  relationType?: RelationType
+}
+
+function getNodeData(node: Node): TableNodeData {
+  return (node.data ?? {}) as unknown as TableNodeData
+}
+
+function getNodeName(node: Node): string {
+  return String(getNodeData(node).name ?? node.id)
+}
+
+function getRelationType(edge: Edge): RelationType {
+  return (edge.data as unknown as RelationEdgeData | undefined)?.relationType ?? 'one-to-many'
+}
+
 function toPrismaType(t: string) {
   const map: Record<string, string> = {
     String: 'String',
@@ -48,7 +72,7 @@ export function generatePrismaSchema(
   // Determine which enums are actually referenced by fields in the nodes.
   const referencedEnumNames = new Set<string>()
   for (const n of nodes) {
-    const fields = (n.data?.fields ?? []) as Field[]
+    const fields = getNodeData(n).fields ?? []
     for (const f of fields) {
       const prismaType = toPrismaType(f.type)
       if ((enums || []).some((e) => e.name === prismaType)) referencedEnumNames.add(prismaType)
@@ -62,10 +86,10 @@ export function generatePrismaSchema(
 
   // Initialize models and fields
   for (const n of nodes) {
-    const modelName = capitalize(String(n.data?.name ?? n.id))
+    const modelName = capitalize(getNodeName(n))
     models[modelName] = { fields: [], relationFields: [], constraints: [] }
 
-    const fields = (n.data?.fields ?? []) as Field[]
+    const fields = getNodeData(n).fields ?? []
     for (const f of fields) {
       const prismaType = toPrismaType(f.type)
       // normalize name and build default line
@@ -141,7 +165,7 @@ export function generatePrismaSchema(
       models[modelName].fields.push(line)
     }
 
-    if (n.data?.junctionTable === true) {
+    if (getNodeData(n).junctionTable === true) {
       const foreignKeyFields = fields.filter((field) => field.fk).map((field) => field.name)
       if (foreignKeyFields.length === 2) {
         models[modelName].constraints.push(`  @@unique([${foreignKeyFields.join(', ')}])`)
@@ -166,32 +190,32 @@ export function generatePrismaSchema(
     const tgt = nodeById[e.target]
     if (!src || !tgt) continue
 
-    const srcModel = capitalize(String(src.data?.name ?? src.id))
-    const tgtModel = capitalize(String(tgt.data?.name ?? tgt.id))
-    const relationType = (e.data as any)?.relationType ?? 'one-to-many'
+    const srcModel = capitalize(getNodeName(src))
+    const tgtModel = capitalize(getNodeName(tgt))
+    const relationType = getRelationType(e)
 
     if (relationType === 'one-to-many') {
       // source (one) -> target (many)
-      const srcFields = (src.data?.fields ?? []) as Field[]
+      const srcFields = getNodeData(src).fields ?? []
       const srcPk = srcFields.find((f: Field) => f.pk)
       const srcPkName = srcPk?.name ?? 'id'
       const srcPkType = toPrismaType(srcPk?.type ?? 'Int')
 
-      const fkName = `${String((src.data as any)?.name)}_id`
-      if (tgt.data?.junctionTable === true) {
+      const fkName = `${getNodeName(src)}_id`
+      if (getNodeData(tgt).junctionTable === true) {
         // Junction tables already declare their foreign keys as actual primary
         // key fields on the junction node, so wire the relation without pushing
         // a duplicate foreign key field (e.g. avoid "product_id" next to the real
         // primary key based FK like "code").
-        const junctionForeignKeyFields = ((tgt.data?.fields ?? []) as Field[]).filter((f) => f.fk).map((f) => f.name)
+        const junctionForeignKeyFields = (getNodeData(tgt).fields ?? []).filter((f) => f.fk).map((f) => f.name)
         // When both tables share the same primary key name (e.g. both default to
         // "id"), the junction foreign keys cannot reuse that shared name twice, so
         // only append "<table name>_id" to the junction table reference.
         const sourceForeignKeyName = junctionForeignKeyFields.includes(srcPkName)
           ? srcPkName
-          : `${String((src.data as { name?: string })?.name ?? src.id)}_id`
-        models[tgtModel].relationFields.push(`  ${String((src.data as { name?: string })?.name)} ${srcModel} @relation(fields: [${sourceForeignKeyName}], references: [${srcPkName}])`)
-        models[srcModel].relationFields.push(`  ${pluralizeRelationName(String((tgt.data as any)?.name))} ${tgtModel}[]`)
+          : `${getNodeName(src)}_id`
+        models[tgtModel].relationFields.push(`  ${getNodeName(src)} ${srcModel} @relation(fields: [${sourceForeignKeyName}], references: [${srcPkName}])`)
+        models[srcModel].relationFields.push(`  ${pluralizeRelationName(getNodeName(tgt))} ${tgtModel}[]`)
       } else {
         if (!hasModelField(tgtModel, fkName)) {
           models[tgtModel].fields.push(`  ${fkName} ${srcPkType}`)
@@ -200,22 +224,22 @@ export function generatePrismaSchema(
             models[tgtModel].constraints.push(fkIndexLine)
           }
         }
-        models[tgtModel].relationFields.push(`  ${String((src.data as any)?.name)} ${srcModel} @relation(fields: [${fkName}], references: [${srcPkName}])`)
-        models[srcModel].relationFields.push(`  ${pluralizeRelationName(String((tgt.data as any)?.name))} ${tgtModel}[]`)
+        models[tgtModel].relationFields.push(`  ${getNodeName(src)} ${srcModel} @relation(fields: [${fkName}], references: [${srcPkName}])`)
+        models[srcModel].relationFields.push(`  ${pluralizeRelationName(getNodeName(tgt))} ${tgtModel}[]`)
       }
     } else if (relationType === 'one-to-one') {
-      const srcFields = (src.data?.fields ?? []) as Field[]
+      const srcFields = getNodeData(src).fields ?? []
       const srcPk = srcFields.find((f: Field) => f.pk)
       const srcPkName = srcPk?.name ?? 'id'
       const srcPkType = toPrismaType(srcPk?.type ?? 'Int')
 
-      const fkName = `${String((src.data as any)?.name)}_id`
+      const fkName = `${getNodeName(src)}_id`
       models[tgtModel].fields.push(`  ${fkName} ${srcPkType} @unique`)
-      models[tgtModel].relationFields.push(`  ${String((src.data as any)?.name)} ${srcModel} @relation(fields: [${fkName}], references: [${srcPkName}])`)
-      models[srcModel].relationFields.push(`  ${String((tgt.data as any)?.name)} ${tgtModel}?`)
+      models[tgtModel].relationFields.push(`  ${getNodeName(src)} ${srcModel} @relation(fields: [${fkName}], references: [${srcPkName}])`)
+      models[srcModel].relationFields.push(`  ${getNodeName(tgt)} ${tgtModel}?`)
     } else if (relationType === 'many-to-many') {
-      models[srcModel].relationFields.push(`  ${String((tgt.data as any)?.name)}s ${tgtModel}[]`)
-      models[tgtModel].relationFields.push(`  ${String((src.data as any)?.name)}s ${srcModel}[]`)
+      models[srcModel].relationFields.push(`  ${getNodeName(tgt)}s ${tgtModel}[]`)
+      models[tgtModel].relationFields.push(`  ${getNodeName(src)}s ${srcModel}[]`)
     }
   }
 

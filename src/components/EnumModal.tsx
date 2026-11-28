@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import plusIcon from '../assets/plus-rounded.svg'
 import crossIcon from '../assets/cross-rounded.svg'
 
@@ -10,20 +10,19 @@ interface Props {
   onDone: (payload: { name: string; values: string[] }) => void
 }
 
-export default function EnumModal({ open, initialName = '', initialValues = [], onCancel, onDone }: Props) {
+type FormProps = Omit<Props, 'open'>
+
+export default function EnumModal({ open, ...props }: Props) {
+  if (!open) return null
+  // Remount the form each time the modal opens so its state starts from
+  // the current initial values without synchronizing state in an effect.
+  return <EnumModalForm {...props} />
+}
+
+function EnumModalForm({ initialName = '', initialValues = [], onCancel, onDone }: FormProps) {
   const [name, setName] = useState(initialName)
   const [valueInput, setValueInput] = useState('')
   const [values, setValues] = useState<string[]>(initialValues)
-
-  useEffect(() => {
-    if (open) {
-      setName(initialName)
-      setValues(initialValues)
-      setValueInput('')
-    }
-  }, [open, initialName, initialValues])
-
-  if (!open) return null
 
   const addValue = () => {
     const v = valueInput.trim()

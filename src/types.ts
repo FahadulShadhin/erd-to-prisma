@@ -13,4 +13,4 @@ export interface DiagramListItem {
   name: string;
 }
 
-export type UpdateFieldFn = (index: number, key: keyof Field, value: any) => void;
+export type UpdateFieldFn = (index: number, key: keyof Field, value: Field[keyof Field]) => void;

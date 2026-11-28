@@ -32,7 +32,7 @@ async function getLatestVersion(pkgName: string): Promise<string | null> {
     if (!res.ok) return null
     const data = await res.json()
     return data.version || null
-  } catch (err) {
+  } catch {
     return null
   }
 }
@@ -89,7 +89,7 @@ export async function generateExpressTemplates(schema: string, options?: { appNa
     }
 
     files['package.json'] = JSON.stringify(pkgObj, null, 2)
-  } catch (err) {
+  } catch {
     files['package.json'] = render(pkgJsTpl, varsBase)
   }
   files['README.md'] = render(readmeTpl, varsBase)
