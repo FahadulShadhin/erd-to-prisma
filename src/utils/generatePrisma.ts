@@ -7,6 +7,7 @@ type Field = {
   fk?: boolean
   nullable?: boolean
   unique?: boolean
+  index?: boolean
 }
 
 function toPrismaType(t: string) {
@@ -124,6 +125,19 @@ export function generatePrismaSchema(
         line += ' @unique'
       }
 
+      // Index handling follows index design best practices:
+      // - A primary key already implies a unique index (emitted via `@id`),
+      //   so we never stack an extra `@@index` on primary keys.
+      // - A unique column already carries a unique index, so an additional
+      //   regular index would be redundant (over-indexing / duplicate).
+      // - Otherwise, an explicit per-field index is emitted as an `@@index`.
+      if (f.index && !f.pk && !f.unique && f.name.trim()) {
+        const indexLine = `  @@index([${f.name}])`
+        if (!models[modelName].constraints.includes(indexLine)) {
+          models[modelName].constraints.push(indexLine)
+        }
+      }
+
       models[modelName].fields.push(line)
     }
 
@@ -158,6 +172,13 @@ export function generatePrismaSchema(
       const fkName = `${String((src.data as any)?.name)}_id`
       if (!hasModelField(tgtModel, fkName)) {
         models[tgtModel].fields.push(`  ${fkName} ${srcPkType}`)
+        // Index design best practice: foreign key columns used in join
+        // predicates should be indexed so lookups against the referenced key
+        // are seek operations instead of table scans.
+        const fkIndexLine = `  @@index([${fkName}])`
+        if (!models[tgtModel].constraints.includes(fkIndexLine)) {
+          models[tgtModel].constraints.push(fkIndexLine)
+        }
       }
       models[tgtModel].relationFields.push(`  ${String((src.data as any)?.name)} ${srcModel} @relation(fields: [${fkName}], references: [${srcPkName}])`)
       models[srcModel].relationFields.push(`  ${pluralizeRelationName(String((tgt.data as any)?.name))} ${tgtModel}[]`)

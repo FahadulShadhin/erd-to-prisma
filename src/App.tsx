@@ -58,28 +58,17 @@ function getNodeIdSeed(nodes: Node[]): number {
   }, 3)
 }
 
-function singularizeTableName(name: string) {
-  if (name.endsWith('ies')) return `${name.slice(0, -3)}y`
-  if (name.endsWith('s') && !/(ss|us|is)$/i.test(name)) return name.slice(0, -1)
-  return name
-}
-
-function pluralizeTableName(name: string) {
-  if (name.endsWith('s')) return name
-  if (/[aeiou]y$/i.test(name)) return `${name}s`
-  if (name.endsWith('y')) return `${name.slice(0, -1)}ies`
-  return `${name}s`
-}
-
 function getJunctionTableName(sourceName: string, targetName: string, nodes: Node[]) {
-  const normalizedName = `${singularizeTableName(sourceName)}${pluralizeTableName(singularizeTableName(targetName))}`
-    .replace(/[^A-Za-z0-9_]/g, '')
-  const baseName = normalizedName || 'Junction'
+  // Junction table names follow the "<tableOne>_<tableTwo>" convention,
+  // e.g. "purchase_product" for a Purchase -> Product relationship.
+  const sourceKey = String(sourceName).toLowerCase().replace(/[^A-Za-z0-9_]/g, '')
+  const targetKey = String(targetName).toLowerCase().replace(/[^A-Za-z0-9_]/g, '')
+  const baseName = `${sourceKey}_${targetKey}`.replace(/^_+|_+$/g, '') || 'Junction'
   const existingNames = new Set(nodes.map((node) => String(node.data?.name ?? '').toLowerCase()))
   let name = baseName
   let suffix = 2
   while (existingNames.has(name.toLowerCase())) {
-    name = `${baseName}${suffix}`
+    name = `${baseName}_${suffix}`
     suffix += 1
   }
   return name
@@ -711,10 +700,13 @@ function FlowCanvasWrapper({
     const junctionName = getJunctionTableName(sourceName, targetName, nodes)
     const junctionId = String(++idRef.current)
     const junctionHandles = getJunctionEdgeHandles(sourceNode, targetNode)
+    // Junction foreign keys reference the *actual* primary key fields of the
+    // source and target tables (e.g. "purchase_id" and "code"), not
+    // "<tableName>_id" placeholders.
     const sourcePrimaryKey = sourceData.fields.find((field) => field.pk)
     const targetPrimaryKey = targetData.fields.find((field) => field.pk)
-    const sourceForeignKey = `${sourceName}_id`
-    const targetForeignKey = `${targetName}_id`
+    const sourceForeignKey = sourcePrimaryKey?.name || `${sourceName}_id`
+    const targetForeignKey = targetPrimaryKey?.name || `${targetName}_id`
     const junctionFields: Field[] = [
       { name: 'id', type: 'Int_autoinc', pk: true, fk: false, nullable: false, unique: true },
       {

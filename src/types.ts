@@ -5,6 +5,7 @@ export interface Field {
   fk: boolean;
   nullable: boolean;
   unique: boolean;
+  index?: boolean;
 }
 
 export interface DiagramListItem {

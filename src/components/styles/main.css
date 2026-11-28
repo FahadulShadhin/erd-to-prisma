@@ -31,6 +31,28 @@
   box-shadow: none !important;
 }
 
+/* Junction table label */
+.table-node.junction-table {
+  position: relative;
+}
+
+.junction-table-label {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 8px;
+  border-radius: 8px;
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg-secondary));
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  z-index: 2;
+}
+
 .table-header {
   display: flex;
   align-items: center;
@@ -155,7 +177,7 @@
 
 .field-row {
   display: grid;
-  grid-template-columns: 40px 1fr 120px 40px 40px 40px;
+  grid-template-columns: 40px 1fr 120px 40px 40px 40px 40px;
   gap: 8px;
   align-items: center;
   padding: 6px;
@@ -185,7 +207,8 @@
 
 .pk-cell,
 .nullable-cell,
-.unique-cell {
+.unique-cell,
+.index-cell {
   justify-content: center;
 }
 

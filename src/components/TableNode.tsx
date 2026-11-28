@@ -81,7 +81,10 @@ export default function TableNode({ id, data }: { id: string; data: TableNodeDat
 
 
   return (
-    <div className="table-node">
+    <div className={`table-node${data.junctionTable ? ' junction-table' : ''}`}>
+      {data.junctionTable && (
+        <div className="junction-table-label">Junction Table</div>
+      )}
       {/* Connection Handles - Top */}
       <Handle type="target" position={Position.Top} id="top-left" className="connection-handle" style={{ left: '25%' }} />
       <Handle type="target" position={Position.Top} id="top-center" className="connection-handle" style={{ left: '50%' }} />
@@ -172,6 +175,7 @@ export default function TableNode({ id, data }: { id: string; data: TableNodeDat
           <div className="field-cell type-cell">Type</div>
           <div className="field-cell nullable-cell">Null</div>
           <div className="field-cell unique-cell">Unique</div>
+          <div className="field-cell index-cell">Index</div>
           <div className="field-cell actions-cell"></div>
         </div>
 
@@ -282,6 +286,17 @@ function FieldRow({ nodeId, field, index, updateField, deleteRow, onPkToggle, op
           onChange={(e) => updateField(index, 'unique', e.target.checked)}
           title="Unique"
           disabled={field.pk}
+        />
+      </div>
+
+      {/* Index Checkbox */}
+      <div className="field-cell index-cell">
+        <input
+          type="checkbox"
+          checked={!!field.index}
+          onChange={(e) => updateField(index, 'index', e.target.checked)}
+          disabled={field.pk}
+          title="Index"
         />
       </div>
 
