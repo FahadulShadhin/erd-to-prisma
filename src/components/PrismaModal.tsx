@@ -2,7 +2,7 @@ import { useState } from 'react'
 import copyIcon from '../assets/copy.svg'
 import downloadIcon from '../assets/download.svg'
 import closeIcon from '../assets/cross-rounded.svg'
-import codeIcon from '../assets/code1.svg'
+// import codeIcon from '../assets/code1.svg'
 import TemplateModal from './TemplateModal'
 
 interface Props {
