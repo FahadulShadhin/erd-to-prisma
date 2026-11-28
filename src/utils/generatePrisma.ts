@@ -183,7 +183,14 @@ export function generatePrismaSchema(
         // key fields on the junction node, so wire the relation without pushing
         // a duplicate foreign key field (e.g. avoid "product_id" next to the real
         // primary key based FK like "code").
-        models[tgtModel].relationFields.push(`  ${String((src.data as any)?.name)} ${srcModel} @relation(fields: [${srcPkName}], references: [${srcPkName}])`)
+        const junctionForeignKeyFields = ((tgt.data?.fields ?? []) as Field[]).filter((f) => f.fk).map((f) => f.name)
+        // When both tables share the same primary key name (e.g. both default to
+        // "id"), the junction foreign keys cannot reuse that shared name twice, so
+        // only append "<table name>_id" to the junction table reference.
+        const sourceForeignKeyName = junctionForeignKeyFields.includes(srcPkName)
+          ? srcPkName
+          : `${String((src.data as { name?: string })?.name ?? src.id)}_id`
+        models[tgtModel].relationFields.push(`  ${String((src.data as { name?: string })?.name)} ${srcModel} @relation(fields: [${sourceForeignKeyName}], references: [${srcPkName}])`)
         models[srcModel].relationFields.push(`  ${pluralizeRelationName(String((tgt.data as any)?.name))} ${tgtModel}[]`)
       } else {
         if (!hasModelField(tgtModel, fkName)) {

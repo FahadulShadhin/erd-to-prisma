@@ -8,17 +8,21 @@ import TemplateModal from './TemplateModal'
 interface Props {
   open: boolean
   schema: string
+  rawSql?: string
   onClose: () => void
 }
 
-export default function PrismaModal({ open, schema, onClose }: Props) {
+export default function PrismaModal({ open, schema, rawSql, onClose }: Props) {
   const [templateOpen, setTemplateOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<'prisma' | 'sql'>('prisma')
 
   if (!open) return null
 
+  const activeContent = activeTab === 'sql' ? (rawSql ?? '') : schema
+
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(schema)
+      await navigator.clipboard.writeText(activeContent)
       // optional: show feedback
     } catch (err) {
       console.error('Copy failed', err)
@@ -26,11 +30,11 @@ export default function PrismaModal({ open, schema, onClose }: Props) {
   }
 
   const handleDownload = () => {
-    const blob = new Blob([schema], { type: 'text/plain;charset=utf-8' })
+    const blob = new Blob([activeContent], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'schema.prisma'
+    a.download = activeTab === 'sql' ? 'schema.sql' : 'schema.prisma'
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -81,7 +85,23 @@ export default function PrismaModal({ open, schema, onClose }: Props) {
           </div>
         </div>
         <div className="prisma-modal-body">
-          <pre className="prisma-schema-textarea" tabIndex={0}>{schema}</pre>
+          <div className="prisma-modal-tabs">
+            <button
+              type="button"
+              className={`btn${activeTab === 'prisma' ? ' primary' : ''}`}
+              onClick={() => setActiveTab('prisma')}
+            >
+              Prisma
+            </button>
+            <button
+              type="button"
+              className={`btn${activeTab === 'sql' ? ' primary' : ''}`}
+              onClick={() => setActiveTab('sql')}
+            >
+              SQL
+            </button>
+          </div>
+          <pre className="prisma-schema-textarea" tabIndex={0}>{activeContent}</pre>
         </div>
       </div>
       <TemplateModal open={templateOpen} schema={schema} onClose={() => setTemplateOpen(false)} />

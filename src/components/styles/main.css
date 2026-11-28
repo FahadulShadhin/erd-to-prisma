@@ -510,6 +510,12 @@ input[type="checkbox"] {
   flex-direction: column;
 }
 
+.prisma-modal-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .prisma-schema-textarea {
   width: 100%;
   /* limit height so modal header/actions stay visible */

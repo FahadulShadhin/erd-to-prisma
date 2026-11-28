@@ -81,6 +81,67 @@ function getForeignKeyFieldType(field?: Field) {
   return field.type
 }
 
+function resolveJunctionForeignKeys(
+  sourceName: string,
+  sourcePrimaryKey: Field | undefined,
+  targetName: string,
+  targetPrimaryKey: Field | undefined
+) {
+  const sourceForeignKey = sourcePrimaryKey?.name || `${sourceName}_id`
+  const targetForeignKey = targetPrimaryKey?.name || `${targetName}_id`
+  // When both tables share the same primary key name (e.g. both default to "id"),
+  // reusing the raw PK names would create two junction foreign keys with the same
+  // column name (e.g. "id" twice). In that case, only append "<table name>_id" to
+  // the junction table reference for each side.
+  const sharedPrimaryKeyName =
+    sourcePrimaryKey?.name && targetPrimaryKey?.name && sourcePrimaryKey.name === targetPrimaryKey.name
+      ? sourcePrimaryKey.name
+      : null
+  return {
+    sourceForeignKey: sharedPrimaryKeyName ? `${sourceName}_id` : sourceForeignKey,
+    targetForeignKey: sharedPrimaryKeyName ? `${targetName}_id` : targetForeignKey,
+  }
+}
+
+function getJunctionForeignKeyFields(junction: Node, relatedNodes: Node[]): Field[] {
+  const sourceNode = relatedNodes[0]
+  const targetNode = relatedNodes[1]
+  if (!sourceNode || !targetNode) {
+    return (junction.data as unknown as TableNodeData).fields
+  }
+  const sourceData = sourceNode.data as unknown as TableNodeData
+  const targetData = targetNode.data as unknown as TableNodeData
+  const sourceName = sourceData.name || sourceNode.id
+  const targetName = targetData.name || targetNode.id
+  const sourcePrimaryKey = sourceData.fields.find((field) => field.pk)
+  const targetPrimaryKey = targetData.fields.find((field) => field.pk)
+  const { sourceForeignKey, targetForeignKey } = resolveJunctionForeignKeys(
+    sourceName,
+    sourcePrimaryKey,
+    targetName,
+    targetPrimaryKey
+  )
+  return [
+    { name: 'id', type: 'Int_autoinc', pk: true, fk: false, nullable: false, unique: true },
+    {
+      name: sourceForeignKey,
+      type: getForeignKeyFieldType(sourcePrimaryKey),
+      pk: false,
+      fk: true,
+      nullable: false,
+      unique: false,
+    },
+    {
+      name: targetForeignKey,
+      type: getForeignKeyFieldType(targetPrimaryKey),
+      pk: false,
+      fk: true,
+      nullable: false,
+      unique: false,
+    },
+  ]
+}
+
 function getJunctionEdgeHandles(firstNode: Node, secondNode: Node) {
   const firstX = firstNode.position.x + (firstNode.measured?.width ?? firstNode.width ?? 0) / 2
   const firstY = firstNode.position.y + (firstNode.measured?.height ?? firstNode.height ?? 0) / 2
@@ -705,8 +766,7 @@ function FlowCanvasWrapper({
     // "<tableName>_id" placeholders.
     const sourcePrimaryKey = sourceData.fields.find((field) => field.pk)
     const targetPrimaryKey = targetData.fields.find((field) => field.pk)
-    const sourceForeignKey = sourcePrimaryKey?.name || `${sourceName}_id`
-    const targetForeignKey = targetPrimaryKey?.name || `${targetName}_id`
+    const { sourceForeignKey, targetForeignKey } = resolveJunctionForeignKeys(sourceName, sourcePrimaryKey, targetName, targetPrimaryKey)
     const junctionFields: Field[] = [
       { name: 'id', type: 'Int_autoinc', pk: true, fk: false, nullable: false, unique: true },
       {
@@ -859,13 +919,44 @@ function FlowCanvasWrapper({
         updateField: (index: number, key: keyof Field, value: Field[keyof Field]) => {
           setNodes((nds) =>
             nds.map((n) => {
-              if (n.id === node.id) {
-                const tableData = n.data as unknown as TableNodeData
-                const newFields = [...tableData.fields]
-                newFields[index] = { ...newFields[index], [key]: value }
-                return { ...n, data: { ...tableData, fields: newFields } }
+              if (n.id !== node.id) {
+                return n
               }
-              return n
+              const tableData = n.data as unknown as TableNodeData
+              const newFields = [...tableData.fields]
+              newFields[index] = { ...newFields[index], [key]: value }
+              const next = { ...n, data: { ...tableData, fields: newFields } }
+              if (key !== 'pk' && key !== 'name') {
+                return next
+              }
+              // Keep junction tables that reference this table in sync when the
+              // primary key (or its field name) changes.
+              const junctionIds = new Set<string>()
+              for (const e of edges) {
+                const otherId = e.source === n.id ? e.target : e.target === n.id ? e.source : null
+                if (!otherId) continue
+                const other = nds.find((candidate) => candidate.id === otherId)
+                if (other && (other.data as { junctionTable?: boolean })?.junctionTable === true) {
+                  junctionIds.add(otherId)
+                }
+              }
+              let updated = next
+              for (const junctionId of junctionIds) {
+                const junction = nds.find((candidate) => candidate.id === junctionId)
+                if (!junction) continue
+                const junctionEdges = edges.filter((e) => e.source === junctionId || e.target === junctionId)
+                const relatedNodes: Node[] = []
+                for (const e of junctionEdges) {
+                  const table = nds.find((candidate) => candidate.id === e.source)
+                  if (table && table.id !== junctionId) {
+                    relatedNodes.push(table)
+                  }
+                }
+                const fields = getJunctionForeignKeyFields(junction, relatedNodes)
+                const junctionData = { ...(junction.data as unknown as TableNodeData), fields }
+                updated = { ...updated, data: junctionData }
+              }
+              return updated
             })
           )
         },
@@ -910,7 +1001,7 @@ function FlowCanvasWrapper({
         },
       },
     }))
-  }, [nodes, setNodes, setEdges])
+  }, [nodes, setNodes, setEdges, edges])
 
   // Render EnumModal globally so it is not constrained by React Flow node layering
 
